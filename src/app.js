@@ -47,21 +47,41 @@ const quoteLabelOptions = ["Highest Loan", "Lowest Cost", "Lowest PG", "Most Fle
 let state = loadState();
 
 function loadState() {
+  const seed = createSeedData();
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     const parsed = JSON.parse(stored);
-    return {
-      ...parsed,
-      products: parsed.products || products,
-      ui: {
-        latest_lender_matches: {},
-        latest_client_email_drafts: {},
-        notifications: [],
-        ...(parsed.ui || {})
-      }
-    };
+    return migrateState(parsed, seed);
   }
-  return { ...createSeedData(), products };
+  return { ...seed, products };
+}
+
+function mergeSeedRecords(seedRows = [], storedRows = []) {
+  const storedById = new Map(storedRows.filter(Boolean).map((row) => [row.id, row]));
+  const seedIds = new Set(seedRows.map((row) => row.id));
+  const mergedSeedRows = seedRows.map((seedRow) => ({
+    ...(storedById.get(seedRow.id) || {}),
+    ...seedRow
+  }));
+  const customRows = storedRows.filter((row) => row?.id && !seedIds.has(row.id));
+  return [...mergedSeedRows, ...customRows];
+}
+
+function migrateState(parsed, seed = createSeedData()) {
+  const merged = { ...seed, ...parsed };
+  for (const key of Object.keys(seed)) {
+    if (Array.isArray(seed[key])) {
+      merged[key] = mergeSeedRecords(seed[key], parsed[key] || []);
+    }
+  }
+  merged.products = mergeSeedRecords(products, parsed.products || []);
+  merged.ui = {
+    latest_lender_matches: {},
+    latest_client_email_drafts: {},
+    notifications: [],
+    ...(parsed.ui || {})
+  };
+  return merged;
 }
 
 function saveState() {
@@ -70,7 +90,8 @@ function saveState() {
 
 function resetState() {
   localStorage.removeItem(STORAGE_KEY);
-  state = { ...createSeedData(), products };
+  const seed = createSeedData();
+  state = { ...seed, products };
   saveState();
 }
 
@@ -81,6 +102,144 @@ function currentUser() {
 
 function setCurrentUser(id) {
   localStorage.setItem(USER_KEY, id);
+}
+
+function organisationById(id) {
+  return state.organisations.find((organisation) => organisation.id === id);
+}
+
+function lenderById(id) {
+  return state.lenderProfiles.find((lender) => lender.id === id);
+}
+
+function userRoleGroup(user = currentUser()) {
+  const role = String(user?.role || "").toLowerCase();
+  if (user?.role_group) return user.role_group;
+  if (/super|admin \/ compliance|platform/.test(role)) return "platform";
+  if (/brokerage admin/.test(role)) return "brokerage_admin";
+  if (/broker/.test(role)) return "broker";
+  if (/client|borrower/.test(role)) return "client";
+  if (/lender admin/.test(role)) return "lender_admin";
+  if (/email-only/.test(role)) return "email_lender";
+  if (/lender|uk lender/.test(role)) return "lender";
+  if (/introducer/.test(role)) return "introducer";
+  if (/professional/.test(role)) return "professional";
+  if (/packaging/.test(role)) return "packaging";
+  return "unknown";
+}
+
+function isPlatformUser(user = currentUser()) {
+  return ["platform"].includes(userRoleGroup(user));
+}
+
+function isBrokerageUser(user = currentUser()) {
+  return ["brokerage_admin", "broker", "packaging"].includes(userRoleGroup(user));
+}
+
+function isClientUser(user = currentUser()) {
+  return userRoleGroup(user) === "client";
+}
+
+function isLenderUser(user = currentUser()) {
+  return ["lender", "lender_admin"].includes(userRoleGroup(user));
+}
+
+function visibleCases(user = currentUser()) {
+  if (!user) return [];
+  const group = userRoleGroup(user);
+  if (group === "platform") return state.cases;
+  if (group === "brokerage_admin") {
+    return state.cases.filter((caseRecord) => caseRecord.brokerage_id === user.brokerage_id || caseRecord.brokerage_organisation_id === user.organisation_id);
+  }
+  if (group === "broker") {
+    return state.cases.filter((caseRecord) => caseRecord.broker_id === user.broker_id || caseRecord.broker_user_id === user.id || (caseRecord.assigned_user_ids || []).includes(user.id));
+  }
+  if (group === "packaging") {
+    return state.cases.filter((caseRecord) => (caseRecord.assigned_user_ids || []).includes(user.id) || caseRecord.brokerage_id === "brokerage-uka");
+  }
+  if (group === "client") {
+    return state.cases.filter((caseRecord) =>
+      caseRecord.client_user_id === user.id ||
+      caseRecord.client_organisation_id === user.organisation_id ||
+      caseParties(caseRecord.id).some((party) => party.client_user_id === user.id || party.organisation_id === user.organisation_id)
+    );
+  }
+  if (group === "lender_admin" || group === "lender") {
+    return state.cases.filter((caseRecord) =>
+      caseRecord.source_lender_id === user.lender_id ||
+      (caseRecord.assigned_lender_ids || []).includes(user.lender_id) ||
+      state.caseLenderSubmissions.some((submission) => submission.case_id === caseRecord.id && submission.lender_id === user.lender_id)
+    );
+  }
+  if (group === "email_lender") {
+    return state.cases.filter((caseRecord) =>
+      state.caseLenderSubmissions.some((submission) => submission.case_id === caseRecord.id && submission.lender_id === user.lender_id && submission.assigned_lender_user_id === user.id)
+    );
+  }
+  if (group === "introducer") {
+    return state.cases.filter((caseRecord) => caseRecord.introducer_user_id === user.id || caseRecord.introducer_organisation_id === user.organisation_id);
+  }
+  if (group === "professional") {
+    return state.cases.filter((caseRecord) => (caseRecord.professional_user_ids || []).includes(user.id));
+  }
+  return [];
+}
+
+function canViewCase(caseRecord, user = currentUser()) {
+  return Boolean(caseRecord && visibleCases(user).some((item) => item.id === caseRecord.id));
+}
+
+function defaultPathForUser(user = currentUser()) {
+  const group = userRoleGroup(user);
+  if (group === "lender_admin" || group === "lender") return "/lender/dashboard";
+  if (group === "email_lender") {
+    const submission = state.caseLenderSubmissions.find((item) => item.lender_id === user?.lender_id && item.assigned_lender_user_id === user?.id) || state.caseLenderSubmissions.find((item) => item.lender_id === user?.lender_id);
+    return submission ? `/lender-response/${submission.response_token}` : "/login";
+  }
+  if (group === "client") return "/client/tasks";
+  if (group === "introducer") return "/introducer/referrals";
+  if (group === "professional") return "/professional/tasks";
+  return "/dashboard";
+}
+
+function canAccessPath(path, user = currentUser()) {
+  if (!user) return path === "/login";
+  if (path === "/demo/permissions") return true;
+  const group = userRoleGroup(user);
+  const caseRecord = getCaseFromPath(path);
+  const tab = path.split("/")[3] || "";
+  if (group === "email_lender") return false;
+  if (group === "platform") return true;
+  if (path === "/dashboard") return true;
+  if (caseRecord) {
+    if (!canViewCase(caseRecord, user)) return false;
+    if (group === "client") return false;
+    if (group === "lender" || group === "lender_admin") return tab === "credit-paper";
+    if (group === "introducer" || group === "professional") return false;
+    return true;
+  }
+  if (path.startsWith("/admin/")) return false;
+  if (group === "brokerage_admin") {
+    return path.startsWith("/cases") ||
+      path.startsWith("/profiles/broker") ||
+      path.startsWith("/profiles/brokerage") ||
+      path.startsWith("/profiles/client") ||
+      path.startsWith("/profiles/lender") ||
+      path.startsWith("/brokerage/") ||
+      path === "/commissions";
+  }
+  if (group === "broker" || group === "packaging") {
+    return path.startsWith("/cases") ||
+      path.startsWith("/profiles/broker") ||
+      path.startsWith("/profiles/client") ||
+      path.startsWith("/profiles/lender") ||
+      path === "/commissions";
+  }
+  if (group === "client") return path.startsWith("/client/") || path === "/profiles/client";
+  if (group === "lender" || group === "lender_admin") return path.startsWith("/lender/") || path === "/profiles/lender";
+  if (group === "introducer") return path.startsWith("/introducer/");
+  if (group === "professional") return path.startsWith("/professional/");
+  return false;
 }
 
 function escapeHtml(value) {
@@ -312,35 +471,72 @@ function render() {
 }
 
 function renderLogin() {
+  const groups = [
+    ["Platform", ["platform", "packaging"]],
+    ["Brokerage", ["brokerage_admin", "broker"]],
+    ["Clients", ["client"]],
+    ["Lenders", ["lender_admin", "lender", "email_lender"]],
+    ["Introducers / Professionals", ["introducer", "professional"]]
+  ];
   app.innerHTML = `
     <main class="login-screen">
-      <section class="login-panel">
+      <section class="login-panel demo-login-panel">
         <div class="login-intro">
           <div class="brand-mark">LT</div>
           <h1>LendTech</h1>
-          <p>Core commercial finance workflow, lender packaging, quote comparison and white-label application infrastructure.</p>
-          <div class="alert green">MVP mode uses local placeholder services for AI, email, documents and integrations.</div>
+          <p>Demo login - authentication placeholder for the broker, lender, client and admin journeys.</p>
+          <div class="alert green">GitHub and Base44 stay aligned; this screen is MVP demo access, not production authentication.</div>
+          <div class="demo-auth-note">
+            <strong>Future production auth still required</strong>
+            <span>Secure login, MFA, invitations, approvals, password reset and session management remain placeholders.</span>
+          </div>
         </div>
-        <form class="login-form" data-form="login">
-          <div class="band-header" style="padding: 0 0 18px; border: 0;">
+        <div class="login-form demo-login-list">
+          <div class="band-header login-card-header">
             <div>
-              <h3>Sign in</h3>
-              <p>Select a seeded MVP user to enter the platform.</p>
+              <h3>Choose a demo user</h3>
+              <p>Each user opens a different role-based workspace with scoped navigation and visibility.</p>
             </div>
+            <button class="button" type="button" data-action="reset-demo">Reset seeded demo</button>
           </div>
-          <div class="field">
-            <label for="login_user">User</label>
-            <select id="login_user" name="user_id">
-              ${state.users.map((user) => `<option value="${valueAttr(user.id)}">${escapeHtml(user.full_name)} - ${escapeHtml(user.role)}</option>`).join("")}
-            </select>
-          </div>
-          <div style="height: 14px;"></div>
-          <button class="button primary" type="submit">Log in</button>
-          <button class="button" type="button" data-action="reset-demo">Reset seeded demo</button>
-          <p class="subtle">Roles available: ${roles.slice(0, 8).map(escapeHtml).join(", ")} and future specialist users.</p>
-        </form>
+          ${groups.map(([label, groupNames]) => {
+            const users = state.users.filter((user) => groupNames.includes(userRoleGroup(user)));
+            if (!users.length) return "";
+            return `
+              <div class="demo-login-group">
+                <div class="demo-group-title">${escapeHtml(label)}</div>
+                <div class="demo-user-grid">
+                  ${users.map((user) => renderDemoUserCard(user)).join("")}
+                </div>
+              </div>
+            `;
+          }).join("")}
+          <p class="subtle">Demo roles available: ${roles.slice(0, 10).map(escapeHtml).join(", ")} and specialist placeholders.</p>
+        </div>
       </section>
     </main>
+  `;
+}
+
+function renderDemoUserCard(user) {
+  const organisation = organisationById(user.organisation_id);
+  const permissions = (user.permissions || []).slice(0, 4);
+  return `
+    <form class="demo-user-card" data-form="login" data-user-id="${valueAttr(user.id)}">
+      <input type="hidden" name="user_id" value="${valueAttr(user.id)}" />
+      <div class="demo-user-head">
+        <span class="demo-avatar">${escapeHtml((user.full_name || user.role || "U").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase())}</span>
+        <div>
+          <h4>${escapeHtml(user.full_name)}</h4>
+          <p>${escapeHtml(user.role)} - ${escapeHtml(organisation?.trading_name || user.organisation_name || "Organisation TBC")}</p>
+        </div>
+      </div>
+      <p>${escapeHtml(user.demo_access || "Role-based demo access.")}</p>
+      <div class="permission-chip-row">
+        ${permissions.map((permission) => `<span>${escapeHtml(permission)}</span>`).join("")}
+      </div>
+      <button class="button primary" type="submit">Login as this user</button>
+    </form>
   `;
 }
 
@@ -355,6 +551,7 @@ function renderExternal(path) {
 
 function renderShell(path) {
   const user = currentUser();
+  const organisation = organisationById(user.organisation_id);
   const title = routeTitle(path);
   return `
     <div class="app-shell">
@@ -374,7 +571,9 @@ function renderShell(path) {
           </div>
           <div class="top-actions">
             ${state.ui.last_notice ? `<span class="status green">${escapeHtml(state.ui.last_notice)}</span>` : ""}
-            <span class="status blue">${escapeHtml(user.full_name)} - ${escapeHtml(user.role)}</span>
+            <span class="status amber">Demo mode</span>
+            <span class="status blue">Logged in as ${escapeHtml(user.full_name)} - ${escapeHtml(user.role)} - ${escapeHtml(organisation?.trading_name || user.organisation_name || "Organisation TBC")}</span>
+            <a class="button" href="/demo/permissions" data-link>View permissions</a>
             <button class="button" type="button" data-action="logout">Switch user</button>
           </div>
         </header>
@@ -388,17 +587,12 @@ function renderShell(path) {
 }
 
 function renderMobileNav(path) {
-  const items = [
-    ["/dashboard", "Home", "HM"],
-    ["/cases/case-hendon-dev/ai", "AI", "AI"],
-    ["/cases", "Cases", "CS"],
-    ["/cases/case-hendon-dev/client-requests", "Tasks", "TS"],
-    ["/lender/dashboard", "More", "MR"]
-  ];
+  const user = currentUser();
+  const items = navSectionsForUser(user).flatMap(([, links]) => links).slice(0, 5);
   return `
     <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
-      ${items.map(([href, label, token]) => `
-        <a href="${valueAttr(href)}" data-link class="${path === href || (label === "Cases" && path.startsWith("/cases") && !path.includes("/ai")) ? "active" : ""}">
+      ${items.map(([href, token, label]) => `
+        <a href="${valueAttr(href)}" data-link class="${isActiveNav(path, href) ? "active" : ""}">
           <span>${escapeHtml(token)}</span>
           ${escapeHtml(label)}
         </a>
@@ -407,40 +601,131 @@ function renderMobileNav(path) {
   `;
 }
 
+function primaryVisibleCase(user = currentUser()) {
+  return visibleCases(user)[0] || state.cases[0];
+}
+
+function navSectionsForUser(user = currentUser()) {
+  const caseRecord = primaryVisibleCase(user);
+  const caseId = caseRecord?.id || "case-hendon-dev";
+  const group = userRoleGroup(user);
+  if (group === "platform") {
+    return [
+      ["Platform", [
+        ["/dashboard", "DB", "Dashboard"],
+        ["/cases", "CS", "Cases"],
+        [`/cases/${caseId}/ai`, "AI", "BankManager.ai"],
+        ["/admin/brokerages", "BG", "Brokerages"],
+        ["/admin/brokers", "BK", "Brokers"],
+        ["/admin/clients", "CL", "Clients"],
+        ["/admin/lenders", "LN", "Lenders"]
+      ]],
+      ["Control", [
+        ["/admin/products", "PR", "Products"],
+        ["/admin/market-intelligence", "MI", "Market intel"],
+        ["/admin/commissions", "CM", "Commissions"],
+        ["/admin/audit", "AU", "Audit"],
+        ["/admin/settings", "ST", "Settings"]
+      ]]
+    ];
+  }
+  if (group === "brokerage_admin") {
+    return [
+      ["Brokerage", [
+        ["/dashboard", "DB", "Dashboard"],
+        ["/cases", "CS", "Cases"],
+        ["/cases/new", "+", "New case"],
+        [`/cases/${caseId}/ai`, "AI", "BankManager.ai"],
+        ["/profiles/client", "CL", "Clients"],
+        ["/profiles/lender", "LN", "Lenders"],
+        ["/commissions", "CM", "Commissions"]
+      ]],
+      ["Organisation", [
+        ["/profiles/brokerage", "BG", "Brokerage"],
+        ["/profiles/broker", "BP", "Broker"],
+        ["/brokerage/settings", "ST", "Settings"]
+      ]]
+    ];
+  }
+  if (group === "broker" || group === "packaging") {
+    return [
+      ["Broker", [
+        ["/dashboard", "DB", "Dashboard"],
+        ["/cases", "CS", "Cases"],
+        ["/cases/new", "+", "New case"],
+        [`/cases/${caseId}/ai`, "AI", "BankManager.ai"],
+        ["/profiles/client", "CL", "Clients"],
+        ["/profiles/lender", "LN", "Lenders"],
+        ["/commissions", "CM", "Commissions"]
+      ]]
+    ];
+  }
+  if (group === "client") {
+    return [
+      ["Client portal", [
+        ["/client/tasks", "TS", "Tasks"],
+        ["/client/documents", "DC", "Documents"],
+        ["/client/messages", "MS", "Messages"],
+        ["/client/quotes", "QT", "Quotes"],
+        ["/client/profile", "PF", "Profile"]
+      ]]
+    ];
+  }
+  if (group === "lender_admin" || group === "lender") {
+    return [
+      ["Lender", [
+        ["/lender/dashboard", "LD", "Lender dashboard"],
+        ["/lender/applications", "AP", "Applications"],
+        ["/lender/credit-papers", "CP", "Credit papers"],
+        ["/lender/appetite", "AT", "Appetite"],
+        ["/lender/white-label", "WL", "White label"],
+        ["/profiles/lender", "PF", "Profile"]
+      ]]
+    ];
+  }
+  if (group === "introducer") {
+    return [
+      ["Introducer", [
+        ["/introducer/referrals", "RF", "Referrals"],
+        ["/introducer/submit", "+", "Submit referral"],
+        ["/introducer/status", "ST", "Status"],
+        ["/introducer/commission", "CM", "Commission"]
+      ]]
+    ];
+  }
+  if (group === "professional") {
+    return [
+      ["Professional", [
+        ["/professional/tasks", "TS", "Tasks"],
+        ["/professional/documents", "DC", "Documents"],
+        ["/professional/messages", "MS", "Messages"],
+        ["/professional/profile", "PF", "Profile"]
+      ]]
+    ];
+  }
+  return [[
+    "Demo",
+    [["/login", "LG", "Login"]]
+  ]];
+}
+
+function isActiveNav(path, href) {
+  if (path === href) return true;
+  if (href === "/cases" && path.startsWith("/cases/") && !path.includes("/ai")) return true;
+  if (href.startsWith("/client/") && path === href) return true;
+  if (href.startsWith("/lender/") && path === href) return true;
+  return false;
+}
+
 function renderNav(path) {
-  const nav = [
-    ["Core", [
-      ["/dashboard", "DB", "Dashboard"],
-      ["/cases", "CS", "Cases"],
-      ["/cases/new", "+", "New case"],
-      ["/apply/uk-lender-group", "WL", "UK Lender link"]
-    ]],
-    ["Profiles", [
-      ["/profiles/broker", "BP", "Broker"],
-      ["/profiles/brokerage", "BG", "Brokerage"],
-      ["/profiles/client", "CL", "Client"],
-      ["/profiles/lender", "LP", "Lender"]
-    ]],
-    ["Lender", [
-      ["/lender/dashboard", "LD", "Lender dashboard"],
-      ["/lender/applications", "AP", "Applications"]
-    ]],
-    ["Admin", [
-      ["/admin/brokerages", "BR", "Brokerages"],
-      ["/admin/brokers", "BK", "Brokers"],
-      ["/admin/lenders", "LN", "Lenders"],
-      ["/admin/products", "PR", "Products"],
-      ["/admin/market-intelligence", "MI", "Market intel"],
-      ["/admin/audit", "AU", "Audit"]
-    ]]
-  ];
+  const nav = navSectionsForUser();
 
   return `
     <nav class="nav">
       ${nav.map(([section, links]) => `
         <div class="nav-section">${escapeHtml(section)}</div>
         ${links.map(([href, token, label]) => `
-          <a href="${valueAttr(href)}" data-link class="${path === href ? "active" : ""}">
+          <a href="${valueAttr(href)}" data-link class="${isActiveNav(path, href) ? "active" : ""}">
             <span class="nav-token">${escapeHtml(token)}</span>
             <span>${escapeHtml(label)}</span>
           </a>
@@ -465,34 +750,74 @@ function routeTitle(path) {
     "/admin/lenders": ["Lenders", "Profiles, appetite and status"],
     "/admin/products": ["Products", "Active MVP products and future product placeholders"],
     "/admin/market-intelligence": ["Market intelligence", "Controlled criteria import and appetite freshness review"],
+    "/admin/clients": ["Clients", "Client organisations, consent status and portal visibility"],
+    "/admin/commissions": ["Commissions", "Permissioned commission ledger oversight"],
     "/admin/audit": ["Audit", "Cross-platform audit trail"],
+    "/admin/settings": ["Settings", "Demo settings and production authentication placeholders"],
+    "/commissions": ["Commissions", "Permissioned broker commission view"],
+    "/brokerage/settings": ["Brokerage settings", "Branding, users and demo-auth placeholders"],
     "/profiles/broker": ["Broker profile", "Permissions, activity, cases and commission visibility"],
     "/profiles/brokerage": ["Brokerage profile", "Branding, regulatory details, users and submission settings"],
     "/profiles/client": ["Client profile", "Tasks, documents, consents and released quote views"],
     "/profiles/lender": ["Lender profile", "Appetite, responses, terms, decline reasons and white-label settings"],
     "/lender/dashboard": ["Lender dashboard", "Credit-paper style application queue"],
-    "/lender/applications": ["Lender applications", "White-label and broker-submitted applications"]
+    "/lender/applications": ["Lender applications", "White-label and broker-submitted applications"],
+    "/lender/credit-papers": ["Credit papers", "Submitted cases available to this lender"],
+    "/lender/appetite": ["Lender appetite", "Products, criteria and freshness labels"],
+    "/lender/white-label": ["White label", "Application link settings and received enquiries"],
+    "/client/tasks": ["Client tasks", "Simple requests for missing information and documents"],
+    "/client/documents": ["Client documents", "Client-visible uploads and document requests"],
+    "/client/messages": ["Client messages", "Broker-approved client communications only"],
+    "/client/quotes": ["Client quotes", "Broker-approved quote comparisons"],
+    "/client/profile": ["Client profile", "Your cases, consents, tasks and shared documents"],
+    "/introducer/referrals": ["Referrals", "Introducer referrals and status"],
+    "/introducer/submit": ["Submit referral", "Basic referral capture placeholder"],
+    "/introducer/status": ["Referral status", "Introducer-visible updates"],
+    "/introducer/commission": ["Referral commission", "Permissioned referral commission placeholder"],
+    "/professional/tasks": ["Professional tasks", "Assigned document and information requests"],
+    "/professional/documents": ["Professional documents", "Uploads and requested professional documents"],
+    "/professional/messages": ["Professional messages", "Case team messages shared with this party"],
+    "/professional/profile": ["Professional profile", "Firm and access placeholder"],
+    "/demo/permissions": ["Demo permissions", "Current seeded user access"]
   };
   const match = titles[path] || ["LendTech", "Focused MVP workspace"];
   return { title: match[0], subtitle: match[1] };
 }
 
 function renderRoute(path) {
+  const user = currentUser();
+  if (!canAccessPath(path, user)) return renderAccessLimited(path);
+  if (path === "/demo/permissions") return renderPermissionsPage();
+  if (path === "/dashboard" && isClientUser(user)) return renderClientPortalPage("tasks");
+  if (path === "/dashboard" && isLenderUser(user)) return renderLenderDashboard();
+  if (path === "/dashboard" && userRoleGroup(user) === "introducer") return renderIntroducerPortalPage("referrals");
+  if (path === "/dashboard" && userRoleGroup(user) === "professional") return renderProfessionalPortalPage("tasks");
   if (path === "/dashboard") return renderDashboard();
   if (path === "/cases") return renderCases();
   if (path === "/cases/new") return renderNewCase();
   if (path === "/admin/brokerages") return renderBrokeragesAdmin();
   if (path === "/admin/brokers") return renderBrokersAdmin();
+  if (path === "/admin/clients") return renderClientsAdmin();
   if (path === "/admin/lenders") return renderLendersAdmin();
   if (path === "/admin/products") return renderProductsAdmin();
   if (path === "/admin/market-intelligence") return renderMarketIntelligenceAdmin();
+  if (path === "/admin/commissions") return renderCommissionsPage({ admin: true });
   if (path === "/admin/audit") return renderAuditAdmin();
+  if (path === "/admin/settings") return renderSettingsPlaceholder();
+  if (path === "/commissions") return renderCommissionsPage();
+  if (path === "/brokerage/settings") return renderSettingsPlaceholder("Brokerage settings");
   if (path === "/profiles/broker") return renderBrokerProfilePage();
   if (path === "/profiles/brokerage") return renderBrokerageProfilePage();
   if (path === "/profiles/client") return renderClientProfilePage();
   if (path === "/profiles/lender") return renderLenderProfilePage();
   if (path === "/lender/dashboard") return renderLenderDashboard();
   if (path === "/lender/applications") return renderLenderApplications();
+  if (path === "/lender/credit-papers") return renderLenderCreditPapersList();
+  if (path === "/lender/appetite") return renderLenderAppetitePage();
+  if (path === "/lender/white-label") return renderLenderWhiteLabelPage();
+  if (path.startsWith("/client/")) return renderClientPortalPage(path.split("/")[2] || "tasks");
+  if (path.startsWith("/introducer/")) return renderIntroducerPortalPage(path.split("/")[2] || "referrals");
+  if (path.startsWith("/professional/")) return renderProfessionalPortalPage(path.split("/")[2] || "tasks");
 
   const caseRecord = getCaseFromPath(path);
   if (!caseRecord) return renderNotFound();
@@ -505,14 +830,16 @@ function renderRoute(path) {
 }
 
 function renderDashboard() {
-  const openCases = state.cases.filter((caseRecord) => !["Archived", "Completed", "Declined"].includes(caseRecord.status));
+  const scopedCases = visibleCases();
+  const scopedCaseIds = new Set(scopedCases.map((caseRecord) => caseRecord.id));
+  const openCases = scopedCases.filter((caseRecord) => !["Archived", "Completed", "Declined"].includes(caseRecord.status));
   const needingAction = openCases.filter((caseRecord) => ["AI extracted draft", "Broker review required", "Information requested", "Ready for lender search", "Quote comparison"].includes(caseRecord.status));
   const missingItems = openCases.reduce((sum, caseRecord) => sum + missingCount(caseRecord), 0);
   const waitingClient = openCases.filter((caseRecord) => missingCount(caseRecord) > 0).length;
-  const waitingLender = state.caseLenderSubmissions.filter((submission) => ["Draft", "Sent", "Viewed", "Decision pending", "Referred to credit"].includes(submission.status)).length;
-  const termsReceived = state.caseLenderSubmissions.filter((submission) => submission.status === "Indicative terms received").length + state.lenderQuotes.filter((quote) => quote.quote_status !== "Awaited").length;
-  const commission = state.cases.reduce((sum, caseRecord) => sum + commissionExpected(caseRecord), 0);
-  const aiReviewCount = state.aiExtractionReviews.filter((review) => review.status === "Pending broker review").length;
+  const waitingLender = state.caseLenderSubmissions.filter((submission) => scopedCaseIds.has(submission.case_id) && ["Draft", "Sent", "Viewed", "Decision pending", "Referred to credit"].includes(submission.status)).length;
+  const termsReceived = state.caseLenderSubmissions.filter((submission) => scopedCaseIds.has(submission.case_id) && submission.status === "Indicative terms received").length + state.lenderQuotes.filter((quote) => scopedCaseIds.has(quote.case_id) && quote.quote_status !== "Awaited").length;
+  const commission = scopedCases.reduce((sum, caseRecord) => sum + commissionExpected(caseRecord), 0);
+  const aiReviewCount = state.aiExtractionReviews.filter((review) => scopedCaseIds.has(review.case_id) && review.status === "Pending broker review").length;
   const priorityCases = [...openCases].sort((a, b) => missingCount(b) - missingCount(a)).slice(0, 5);
   const kpis = [
     ["NA", needingAction.length, "Needs action", "Broker queue"],
@@ -596,7 +923,7 @@ function renderDashboard() {
           <a class="text-link" href="/admin/audit" data-link>View full audit</a>
         </div>
         <div class="activity-feed">
-          ${state.auditLogs.slice(0, 5).map((log) => `
+          ${state.auditLogs.filter((log) => scopedCaseIds.has(log.case_id)).slice(0, 5).map((log) => `
             <div class="activity-item">
               <span class="mini-icon">AU</span>
               <div>
@@ -605,7 +932,7 @@ function renderDashboard() {
                 <small>${escapeHtml(log.entity_type)} · ${escapeHtml(new Date(log.created_date).toLocaleString())}</small>
               </div>
             </div>
-          `).join("")}
+          `).join("") || `<div class="empty-state">No visible activity yet.</div>`}
         </div>
       </aside>
     </div>
@@ -629,6 +956,8 @@ function statusPill(status) {
 }
 
 function renderCases() {
+  const cases = visibleCases();
+  const canCreate = isPlatformUser() || isBrokerageUser();
   return `
     <section class="band">
       <div class="band-header">
@@ -636,13 +965,13 @@ function renderCases() {
           <h3>Case list</h3>
           <p>Broker-facing case pipeline for bridging, development and future finance products.</p>
         </div>
-        <a class="button primary" href="/cases/new" data-link>Create case</a>
+        ${canCreate ? `<a class="button primary" href="/cases/new" data-link>Create case</a>` : ""}
       </div>
       <div class="band-body table-wrap">
         <table>
           <thead><tr><th>Reference</th><th>Client</th><th>Product</th><th>Loan</th><th>Regulated status</th><th>Status</th></tr></thead>
           <tbody>
-            ${state.cases.map((caseRecord) => {
+            ${cases.map((caseRecord) => {
               const party = state.applicationParties.find((item) => item.id === caseRecord.client_id);
               return `
                 <tr>
@@ -654,7 +983,7 @@ function renderCases() {
                   <td>${statusPill(caseRecord.status)}</td>
                 </tr>
               `;
-            }).join("")}
+            }).join("") || `<tr><td colspan="6">No cases are visible to this demo user.</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -1767,7 +2096,8 @@ function renderCommission(caseRecord) {
 }
 
 function renderBrokerProfilePage() {
-  const broker = state.brokerProfiles[0];
+  const user = currentUser();
+  const broker = state.brokerProfiles.find((item) => item.id === user?.broker_id || item.user_id === user?.id) || state.brokerProfiles[0];
   const cases = state.cases.filter((caseRecord) => caseRecord.broker_id === broker?.id);
   const activity = state.auditLogs.filter((log) => cases.some((caseRecord) => caseRecord.id === log.case_id)).slice(0, 5);
   return `
@@ -1799,7 +2129,8 @@ function renderBrokerProfilePage() {
 }
 
 function renderBrokerageProfilePage() {
-  const brokerage = state.brokerageProfiles[0];
+  const user = currentUser();
+  const brokerage = state.brokerageProfiles.find((item) => item.id === user?.brokerage_id) || state.brokerageProfiles[0];
   const users = state.brokerProfiles.filter((broker) => broker.brokerage_id === brokerage?.id);
   return `
     <section class="band">
@@ -1829,8 +2160,9 @@ function renderBrokerageProfilePage() {
 }
 
 function renderClientProfilePage() {
-  const client = state.applicationParties[0];
-  const cases = state.cases.filter((caseRecord) => caseRecord.client_id === client?.id || caseParties(caseRecord.id).some((party) => party.id === client?.id));
+  const user = currentUser();
+  const cases = isClientUser(user) ? visibleCases(user) : state.cases.filter((caseRecord) => caseRecord.client_user_id || caseRecord.client_organisation_id);
+  const client = state.applicationParties.find((party) => party.client_user_id === user?.id || party.organisation_id === user?.organisation_id) || state.applicationParties.find((party) => cases.some((caseRecord) => caseRecord.client_id === party.id)) || state.applicationParties[0];
   const tasks = state.clientTasks.filter((task) => cases.some((caseRecord) => caseRecord.id === task.case_id));
   const docs = state.documents.filter((doc) => cases.some((caseRecord) => caseRecord.id === doc.case_id));
   const consents = state.consentRecords.filter((consent) => cases.some((caseRecord) => caseRecord.id === consent.case_id));
@@ -1864,7 +2196,8 @@ function renderClientProfilePage() {
 }
 
 function renderLenderProfilePage() {
-  const lender = state.lenderProfiles.find((item) => item.id === "lender-uklg") || state.lenderProfiles[0];
+  const user = currentUser();
+  const lender = state.lenderProfiles.find((item) => item.id === user?.lender_id) || state.lenderProfiles.find((item) => item.id === "lender-uklg") || state.lenderProfiles[0];
   const appetites = state.lenderAppetites.filter((appetite) => appetite.lender_id === lender?.id);
   const submissions = state.caseLenderSubmissions.filter((submission) => submission.lender_id === lender?.id);
   const settings = state.whiteLabelApplicationSettings.find((item) => item.lender_id === lender?.id);
@@ -2006,16 +2339,17 @@ function renderSimpleAdminTable(title, rows, fields) {
 }
 
 function renderLenderDashboard() {
-  const uklg = state.lenderProfiles.find((lender) => lender.id === "lender-uklg");
-  const submissions = state.caseLenderSubmissions.filter((submission) => submission.lender_id === uklg?.id);
+  const user = currentUser();
+  const lender = state.lenderProfiles.find((item) => item.id === user?.lender_id) || state.lenderProfiles.find((item) => item.id === "lender-uklg");
+  const submissions = state.caseLenderSubmissions.filter((submission) => submission.lender_id === lender?.id);
   return `
     <section class="lender-hero">
       <div>
-        <div class="brand-card compact"><span>${escapeHtml(uklg?.logo || "UKLG")}</span><strong>${escapeHtml(uklg?.lender_name || "Lender")}</strong></div>
+        <div class="brand-card compact"><span>${escapeHtml(lender?.logo || "LD")}</span><strong>${escapeHtml(lender?.lender_name || "Lender")}</strong></div>
         <h2>Credit-paper application queue</h2>
         <p>Review white-label and broker-submitted applications in one clean lender workspace.</p>
       </div>
-      <a class="button primary" href="/apply/uk-lender-group" data-link>Open application link</a>
+      ${lender?.id === "lender-uklg" ? `<a class="button primary" href="/apply/uk-lender-group" data-link>Open application link</a>` : ""}
     </section>
     <div class="case-metric-row compact-row">
       <div class="metric"><span>Applications</span><strong>${submissions.length}</strong><small>Assigned in LendTech</small></div>
@@ -2046,6 +2380,8 @@ function renderLenderDashboard() {
 }
 
 function renderLenderApplications() {
+  const user = currentUser();
+  const lenderId = user?.lender_id || "lender-uklg";
   return `
     <section class="band">
       <div class="band-header"><div><h3>White-label applications</h3><p>The UK Lender Group applications created through /apply/uk-lender-group.</p></div><a class="button primary" href="/apply/uk-lender-group" data-link>Open application link</a></div>
@@ -2053,12 +2389,243 @@ function renderLenderApplications() {
         <table>
           <thead><tr><th>Case</th><th>Source</th><th>Applicant</th><th>Product</th><th>Loan</th><th>Status</th></tr></thead>
           <tbody>
-            ${state.cases.filter((caseRecord) => caseRecord.source_lender_id === "lender-uklg" || caseRecord.source_application_link === "/apply/uk-lender-group").map((caseRecord) => {
+            ${state.cases.filter((caseRecord) => caseRecord.source_lender_id === lenderId || state.caseLenderSubmissions.some((submission) => submission.case_id === caseRecord.id && submission.lender_id === lenderId)).map((caseRecord) => {
               const party = state.applicationParties.find((item) => item.id === caseRecord.client_id);
               return `<tr><td><a href="/cases/${caseRecord.id}/credit-paper" data-link>${escapeHtml(caseRecord.case_reference)}</a></td><td>${escapeHtml(caseRecord.source_application_link)}</td><td>${escapeHtml(party?.name || "TBC")}</td><td>${escapeHtml(caseRecord.case_type)}</td><td>${formatMoney(caseRecord.loan_amount_requested)}</td><td>${statusPill(caseRecord.status)}</td></tr>`;
             }).join("") || `<tr><td colspan="6">No direct white-label applications yet.</td></tr>`}
           </tbody>
         </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderClientsAdmin() {
+  const rows = state.applicationParties.map((party) => ({
+    name: party.name,
+    email: party.email,
+    phone: party.phone,
+    organisation: organisationById(party.organisation_id)?.organisation_name || party.organisation_id || "TBC",
+    case_reference: getCase(party.case_id)?.case_reference || "TBC"
+  }));
+  return renderSimpleAdminTable("Client profiles", rows, ["name", "email", "phone", "organisation", "case_reference"]);
+}
+
+function renderCommissionsPage(options = {}) {
+  const cases = options.admin ? state.cases : visibleCases();
+  const caseIds = new Set(cases.map((caseRecord) => caseRecord.id));
+  const rows = state.commissionLedger.filter((ledger) => caseIds.has(ledger.case_id));
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>${options.admin ? "Platform commission ledger" : "Commission view"}</h3><p>Permissioned commission tracking remains hidden from client and lender users.</p></div></div>
+      <div class="band-body table-wrap">
+        <table>
+          <thead><tr><th>Case</th><th>Broker fee</th><th>Lender proc fee</th><th>Platform share</th><th>Broker share</th><th>Status</th></tr></thead>
+          <tbody>
+            ${rows.map((ledger) => {
+              const caseRecord = getCase(ledger.case_id);
+              return `<tr><td>${escapeHtml(caseRecord?.case_reference || ledger.case_id)}</td><td>${formatMoney(ledger.expected_broker_fee)}</td><td>${formatMoney(ledger.expected_lender_procuration_fee)}</td><td>${formatMoney(ledger.uka_lendtech_share)}</td><td>${formatMoney(ledger.broker_share)}</td><td>${statusPill(ledger.payment_status)}</td></tr>`;
+            }).join("") || `<tr><td colspan="6">No commission records visible to this user.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderSettingsPlaceholder(title = "Settings") {
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>${escapeHtml(title)}</h3><p>Demo settings and future production authentication controls.</p></div></div>
+      <div class="band-body grid two">
+        <div class="profile-panel">
+          <h3>Demo mode</h3>
+          <p>This MVP uses seeded demo users and local state so each journey can be tested without production authentication.</p>
+          <div class="label-row">${statusPill("Demo login")} ${statusPill("Role-based navigation")} ${statusPill("Manual override remains")}</div>
+        </div>
+        <div class="profile-panel">
+          <h3>Production auth required</h3>
+          <p>Future production access should include secure login, MFA, invitations, role approval, password reset, session management and audit logging.</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderLenderCreditPapersList() {
+  const user = currentUser();
+  const submissions = state.caseLenderSubmissions.filter((submission) => submission.lender_id === user?.lender_id);
+  return `
+    <section class="surface-panel">
+      <div class="section-heading"><div><h3>Credit papers</h3><p>Only cases submitted to this lender are visible.</p></div></div>
+      <div class="lender-queue">
+        ${submissions.map((submission) => {
+          const caseRecord = getCase(submission.case_id);
+          const party = caseParty(caseRecord);
+          return `
+            <article class="lender-queue-card">
+              <div>
+                <a href="/cases/${caseRecord.id}/credit-paper" data-link><strong>${escapeHtml(caseRecord.case_reference)}</strong></a>
+                <p>${escapeHtml(party?.name || "Borrower TBC")} - ${escapeHtml(caseRecord.case_type)}</p>
+              </div>
+              <span>${formatMoney(caseRecord.loan_amount_requested)}</span>
+              ${statusPill(submission.status)}
+              <a class="button compact" href="/cases/${caseRecord.id}/credit-paper" data-link>Open paper</a>
+            </article>
+          `;
+        }).join("") || `<div class="empty-state">No submitted credit papers for this lender yet.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderLenderAppetitePage() {
+  const user = currentUser();
+  const lender = lenderById(user?.lender_id) || lenderById("lender-uklg");
+  const appetites = state.lenderAppetites.filter((appetite) => appetite.lender_id === lender?.id);
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>${escapeHtml(lender?.lender_name || "Lender")} appetite</h3><p>Approved or placeholder appetite records with freshness labels.</p></div></div>
+      <div class="band-body grid two">
+        ${appetites.map((appetite) => `
+          <article class="profile-panel">
+            <div class="actions" style="justify-content:space-between;"><h3>${escapeHtml(appetite.product_type)}</h3>${freshnessPill(appetite)}</div>
+            <dl class="kv">
+              <dt>Loan range</dt><dd>${formatMoney(appetite.minimum_loan)} to ${formatMoney(appetite.maximum_loan)}</dd>
+              <dt>Max LTV</dt><dd>${formatPercent(appetite.max_ltv)}</dd>
+              <dt>Regions</dt><dd>${escapeHtml((appetite.regions_accepted || []).join(", "))}</dd>
+              <dt>Source</dt><dd>${escapeHtml(appetite.source || "Seed appetite")}</dd>
+            </dl>
+          </article>
+        `).join("") || `<div class="empty-state">No appetite records yet.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderLenderWhiteLabelPage() {
+  const user = currentUser();
+  const lenderId = user?.lender_id || "lender-uklg";
+  const settings = state.whiteLabelApplicationSettings.find((item) => item.lender_id === lenderId);
+  if (!settings) return `<section class="band"><div class="band-body empty-state">No white-label settings for this lender yet.</div></section>`;
+  const received = state.cases.filter((caseRecord) => caseRecord.source_lender_id === lenderId || caseRecord.source_application_link === `/apply/${settings.application_link_slug}`);
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>White-label application link</h3><p>Applications route into this lender's credit queue.</p></div><a class="button primary" href="/apply/${valueAttr(settings.application_link_slug)}" data-link>Open link</a></div>
+      <div class="band-body grid two">
+        <div class="profile-panel">
+          <h3>/apply/${escapeHtml(settings.application_link_slug)}</h3>
+          <p>${escapeHtml(settings.footer_text)}</p>
+          <div class="label-row">${statusPill(settings.status)} ${statusPill(settings.requires_client_consent ? "Consent required" : "Consent optional")}</div>
+        </div>
+        <div class="profile-panel">
+          <h3>Applications received</h3>
+          <strong style="font-size:32px;">${received.length}</strong>
+          <p class="subtle">White-label applications auto-create a LendTech case, source record, consent record and lender submission.</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderClientPortalPage(section = "tasks") {
+  const cases = visibleCases();
+  const caseIds = new Set(cases.map((caseRecord) => caseRecord.id));
+  const tasks = state.clientTasks.filter((task) => caseIds.has(task.case_id) && task.client_visible !== false);
+  const docs = state.documents.filter((doc) => caseIds.has(doc.case_id) && !/internal/i.test(doc.visibility || ""));
+  const messages = state.clientMessages.filter((message) => caseIds.has(message.case_id) && message.client_visible !== false);
+  const quotes = state.lenderQuotes.filter((quote) => caseIds.has(quote.case_id) && /approved/i.test(quote.quote_status || ""));
+  const intro = `
+    <div class="grid four">
+      <div class="metric"><span>Tasks</span><strong>${tasks.length}</strong><small>Broker-approved requests</small></div>
+      <div class="metric"><span>Documents</span><strong>${docs.length}</strong><small>Client-visible files</small></div>
+      <div class="metric"><span>Messages</span><strong>${messages.length}</strong><small>Shared updates</small></div>
+      <div class="metric"><span>Quotes</span><strong>${quotes.length}</strong><small>Approved only</small></div>
+    </div>
+  `;
+  if (section === "profile") return `${intro}${renderClientProfilePage()}`;
+  if (section === "documents") {
+    return `${intro}<section class="band"><div class="band-header"><div><h3>Documents</h3><p>Upload or review documents requested by the broker.</p></div></div><div class="band-body">${docs.map((doc) => `<div class="client-task-button"><strong>${escapeHtml(doc.document_type)}</strong><span>${escapeHtml(doc.status)} - ${escapeHtml(doc.visibility || "Client visible")}</span><div class="actions"><button class="button compact" type="button">Upload replacement</button><button class="button compact" type="button">Ask a question</button></div></div>`).join("") || `<div class="empty-state">No client-visible documents yet.</div>`}</div></section>`;
+  }
+  if (section === "messages") {
+    return `${intro}<section class="band"><div class="band-header"><div><h3>Messages</h3><p>Only broker-approved client communications are shown.</p></div></div><div class="band-body">${messages.map((message) => `<div class="timeline-item"><strong>${escapeHtml(message.direction)}</strong><p>${escapeHtml(message.body)}</p><span class="subtle">${escapeHtml(message.status)}</span></div>`).join("") || `<div class="empty-state">No shared messages yet.</div>`}</div></section>`;
+  }
+  if (section === "quotes") {
+    return `${intro}<section class="band"><div class="band-header"><div><h3>Broker-approved quotes</h3><p>Internal notes, lender strategy and commission details remain hidden.</p></div></div><div class="band-body quote-card-grid">${quotes.map((quote) => `<article class="quote-card"><div class="quote-card-header"><h3>${escapeHtml(quote.lender_name)}</h3>${statusPill(quote.quote_status)}</div><dl class="kv"><dt>Loan</dt><dd>${formatMoney(quote.loan_amount)}</dd><dt>Rate</dt><dd>${formatPercent(quote.interest_rate)}</dd><dt>Monthly cost</dt><dd>${formatMoney(quote.monthly_interest_cost)}</dd><dt>PG</dt><dd>${formatPercent(quote.personal_guarantee_percentage)}</dd></dl><p><strong>Pros</strong><br>${escapeHtml((quote.pros || []).slice(0, 3).join(", ") || "To confirm")}</p><p><strong>Cons</strong><br>${escapeHtml((quote.cons || []).slice(0, 3).join(", ") || "To confirm")}</p></article>`).join("") || `<div class="empty-state">No broker-approved quote comparisons yet.</div>`}</div></section>`;
+  }
+  return `${intro}<section class="band"><div class="band-header"><div><h3>Tasks</h3><p>Simple client requests. No internal broker notes are shown.</p></div></div><div class="band-body task-button-grid">${tasks.map((task) => `<button class="client-task-button" type="button"><strong>${escapeHtml(task.requested_item || task.request_type)}</strong><span>${escapeHtml(task.notes || task.status)}</span><div class="actions"><span class="status amber">${escapeHtml(task.status)}</span><span class="status blue">Upload</span><span class="status blue">Answer</span><span class="status blue">Ask a question</span></div></button>`).join("") || `<div class="empty-state">No open client tasks.</div>`}</div></section>`;
+}
+
+function renderIntroducerPortalPage(section = "referrals") {
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>Introducer workspace</h3><p>Basic referral flow placeholder. Introducers cannot submit directly to lenders.</p></div></div>
+      <div class="band-body grid two">
+        <div class="profile-panel">
+          <h3>${section === "submit" ? "Submit referral" : "Referral status"}</h3>
+          <p>Seed Introducer Ltd can submit a basic referral, view status and see permissioned commission/referral information where approved.</p>
+          <div class="label-row">${statusPill("Referral access only")} ${statusPill("No lender strategy")} ${statusPill("Broker approval required")}</div>
+        </div>
+        <div class="profile-panel">
+          <h3>Demo referral</h3>
+          <p>No live referral case has been assigned yet. This placeholder preserves the route without adding the full introducer product module.</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderProfessionalPortalPage(section = "tasks") {
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>Professional party workspace</h3><p>Assigned task, document and message placeholder for solicitors, QS, valuers and advisers.</p></div></div>
+      <div class="band-body grid two">
+        <div class="profile-panel">
+          <h3>${section === "documents" ? "Documents" : section === "messages" ? "Messages" : "Tasks"}</h3>
+          <p>Professional users only see requests assigned to them. They cannot browse the full case unless specifically permissioned.</p>
+          <div class="label-row">${statusPill("Task-limited")} ${statusPill("Upload allowed")} ${statusPill("Full case hidden")}</div>
+        </div>
+        <div class="profile-panel">
+          <h3>Seed Solicitor Firm</h3>
+          <p>Placeholder professional organisation for future legal document and information request workflows.</p>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderPermissionsPage() {
+  const user = currentUser();
+  const organisation = organisationById(user?.organisation_id);
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>Demo permissions</h3><p>This describes the seeded MVP access for the current demo user.</p></div><a class="button" href="/login" data-link>Switch user</a></div>
+      <div class="band-body grid two">
+        <div class="profile-panel">
+          <h3>${escapeHtml(user?.full_name || "Demo user")}</h3>
+          <dl class="kv">
+            <dt>Email</dt><dd>${escapeHtml(user?.email || "TBC")}</dd>
+            <dt>Role</dt><dd>${escapeHtml(user?.role || "TBC")}</dd>
+            <dt>Organisation</dt><dd>${escapeHtml(organisation?.organisation_name || user?.organisation_name || "TBC")}</dd>
+            <dt>Mode</dt><dd>Demo login - authentication placeholder</dd>
+          </dl>
+        </div>
+        <div class="profile-panel">
+          <h3>Permissions</h3>
+          <ul class="simple-list">${(user?.permissions || []).map((permission) => `<li>${escapeHtml(permission)}</li>`).join("")}</ul>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderAccessLimited(path) {
+  const user = currentUser();
+  return `
+    <section class="band">
+      <div class="band-header"><div><h3>Access limited in this demo role</h3><p>${escapeHtml(user?.full_name || "This user")} is logged in as ${escapeHtml(user?.role || "a restricted role")}.</p></div><a class="button" href="${valueAttr(defaultPathForUser(user))}" data-link>Go to my workspace</a></div>
+      <div class="band-body">
+        <div class="empty-state">This route is hidden for the current role: ${escapeHtml(path)}. Switch user from demo login to test another journey.</div>
       </div>
     </section>
   `;
@@ -2336,8 +2903,9 @@ window.addEventListener("popstate", render);
 
 function handleLogin(data) {
   setCurrentUser(data.user_id);
-  notify("Logged in");
-  navigate("/dashboard");
+  const user = state.users.find((item) => item.id === data.user_id);
+  notify(`Logged in as ${user?.full_name || "demo user"}`);
+  navigate(defaultPathForUser(user));
 }
 
 function handleNewCase(data) {
@@ -2969,10 +3537,18 @@ function handleWhiteLabelApplication(settingsId, data) {
     source_brand: lender.lender_name,
     source_app: "White-label application",
     source_lender_id: lender.id,
+    source_lender_organisation_id: lender.id === "lender-uklg" ? "org-uklg" : "",
     source_application_link: `/apply/${settings.application_link_slug}`,
     brokerage_id: "brokerage-uka",
+    brokerage_organisation_id: "org-uka",
     broker_id: "broker-max",
+    broker_user_id: "user-broker-max",
     client_id: partyId,
+    client_user_id: "",
+    client_organisation_id: "",
+    assigned_user_ids: ["user-broker-max", settings.assign_to_lendtech_admin_user].filter(Boolean),
+    assigned_lender_ids: [lender.id],
+    assigned_lender_user_ids: [settings.assign_to_lender_team_user, settings.assign_to_lender_admin_user].filter(Boolean),
     product_id: product?.id || "prod-bridging",
     case_type: data.product_name || "Bridging Finance",
     status: settings.default_application_status,
@@ -3055,6 +3631,8 @@ function handleWhiteLabelApplication(settingsId, data) {
     id: submissionId,
     case_id: caseId,
     lender_id: lender.id,
+    lender_organisation_id: lender.id === "lender-uklg" ? "org-uklg" : "",
+    assigned_lender_user_id: settings.assign_to_lender_team_user || settings.assign_to_lender_admin_user || "",
     submission_level: "Quick enquiry with client information",
     disclosure_level: "White-label applicant provided details",
     status: "Viewed",
@@ -3067,7 +3645,7 @@ function handleWhiteLabelApplication(settingsId, data) {
     notes: "Auto-created from white-label application link.",
     response_token: createId("tok")
   });
-  addAudit(caseId, "White-label application submitted", "Case", caseId, `${lender.lender_name} white-label application created a LendTech case.`);
+  addAudit(caseId, "White-label application submitted", "Case", caseId, `${lender.lender_name} white-label application created a LendTech case, consent record, source record and lender queue item.`);
   notify("White-label application created");
   saveState();
   history.pushState({}, "", `/apply/${settings.application_link_slug}?submitted=${caseId}`);
