@@ -841,6 +841,7 @@ function renderDashboard() {
   const commission = scopedCases.reduce((sum, caseRecord) => sum + commissionExpected(caseRecord), 0);
   const aiReviewCount = state.aiExtractionReviews.filter((review) => scopedCaseIds.has(review.case_id) && review.status === "Pending broker review").length;
   const priorityCases = [...openCases].sort((a, b) => missingCount(b) - missingCount(a)).slice(0, 5);
+  const aiCase = priorityCases[0] || openCases[0] || state.cases[0];
   const kpis = [
     ["NA", needingAction.length, "Needs action", "Broker queue"],
     ["CL", waitingClient, "Waiting client", `${missingItems} missing items`],
@@ -856,20 +857,19 @@ function renderDashboard() {
       <div class="ai-dashboard-main">
         <div class="eyebrow">BankManager.ai</div>
         <h2>BankManager.ai</h2>
-        <p>Paste an enquiry, upload documents or ask what to do next.</p>
+        <p>Drop files, paste an email, or tell me what you know. I'll work out the next step.</p>
         <div class="ai-prompt-shell">
-          <textarea aria-label="BankManager.ai dashboard prompt" placeholder="Paste a client email, lender reply, term sheet notes or describe the case..."></textarea>
+          <textarea aria-label="BankManager.ai dashboard prompt" placeholder="Paste a client email, lender reply, WhatsApp notes, term sheet or case summary..."></textarea>
           <div class="ai-prompt-actions">
-            <button class="button soft" type="button">Upload</button>
-            <a class="button primary" href="/cases/new" data-link>Analyse</a>
-            <a class="button ghost" href="/cases/new" data-link>Create case</a>
+            <a class="button soft" href="/cases/${aiCase?.id || "case-hendon-dev"}/ai" data-link>Upload</a>
+            <a class="button primary" href="/cases/${aiCase?.id || "case-hendon-dev"}/ai" data-link>Analyse</a>
           </div>
         </div>
-        <div class="quick-chip-row">
-          <a href="/cases/new" data-link>Analyse enquiry</a>
-          <a href="/cases/new" data-link>Upload files</a>
-          <a href="/cases/case-hendon-dev/client-requests" data-link>Draft client request</a>
-          <a href="/cases/case-btl-refi/quote-comparison" data-link>Compare quotes</a>
+        <div class="ai-prompt-hints">
+          <span>I have a new enquiry</span>
+          <span>I have lender terms</span>
+          <span>I want to compare quotes</span>
+          <span>I need missing info</span>
         </div>
       </div>
     </section>
@@ -1249,112 +1249,253 @@ function renderCaseOverview(caseRecord) {
   `;
 }
 
+function aiUploadsForCase(caseId) {
+  return state.ui.ai_uploads?.[caseId] || [];
+}
+
+function setAiUploadsForCase(caseId, uploads) {
+  state.ui.ai_uploads = {
+    ...(state.ui.ai_uploads || {}),
+    [caseId]: uploads
+  };
+  saveState();
+}
+
+function fileTypeLabel(file) {
+  const name = file?.name || "";
+  const extension = name.includes(".") ? name.split(".").pop().toUpperCase() : "";
+  if (file?.type?.includes("pdf")) return "PDF";
+  if (/doc/i.test(extension)) return "Word";
+  if (/xls/i.test(extension)) return "Excel";
+  if (extension === "CSV") return "CSV";
+  if (/png|jpg|jpeg/i.test(extension) || file?.type?.startsWith("image/")) return "Image";
+  if (/msg|eml/i.test(extension)) return "Email";
+  return extension || "File";
+}
+
+function addAiFilesForCase(caseId, files = []) {
+  const existing = aiUploadsForCase(caseId);
+  const additions = Array.from(files).map((file) => ({
+    id: createId("file"),
+    name: file.name || "Uploaded file",
+    type: fileTypeLabel(file),
+    size: file.size || 0,
+    placeholder_only: true,
+    created_date: todayIso()
+  }));
+  if (!additions.length) return;
+  setAiUploadsForCase(caseId, [...existing, ...additions]);
+  notify(`${additions.length} file${additions.length === 1 ? "" : "s"} attached for analysis`);
+}
+
+function removeAiFile(caseId, fileId) {
+  setAiUploadsForCase(caseId, aiUploadsForCase(caseId).filter((file) => file.id !== fileId));
+  notify("File removed");
+}
+
+function renderAiFileChips(caseId) {
+  const uploads = aiUploadsForCase(caseId);
+  if (!uploads.length) return `<div class="ai-file-empty">No files attached yet. Drop files here or use Upload.</div>`;
+  return `
+    <div class="ai-file-chip-row">
+      ${uploads.map((file) => `
+        <span class="ai-file-chip">
+          <span class="mini-icon">FL</span>
+          <span><strong>${escapeHtml(file.name)}</strong><small>${escapeHtml(file.type || "File")} ${file.size ? `- ${escapeHtml(formatFileSize(file.size))}` : ""}</small></span>
+          <button type="button" aria-label="Remove ${valueAttr(file.name)}" data-action="remove-ai-file" data-case-id="${valueAttr(caseId)}" data-file-id="${valueAttr(file.id)}">x</button>
+        </span>
+      `).join("")}
+    </div>
+  `;
+}
+
+function formatFileSize(size) {
+  const number = Number(size || 0);
+  if (!number) return "";
+  if (number < 1024 * 1024) return `${Math.max(1, Math.round(number / 1024))} KB`;
+  return `${(number / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function latestAiSourceForCase(caseId) {
+  return state.brainDumpSourceRecords
+    .filter((source) => source.case_id === caseId && source.analysis_summary)
+    .sort((a, b) => String(b.created_date).localeCompare(String(a.created_date)))[0];
+}
+
+function analysisSuggestionValue(analysis, fieldKey) {
+  const suggestion = (analysis?.suggestions || []).find((item) => item.field_key === fieldKey);
+  return suggestion?.suggested_value || "";
+}
+
 function renderBankManager(caseRecord) {
   const reviews = state.aiExtractionReviews.filter((review) => review.case_id === caseRecord.id);
-  const latestSource = state.brainDumpSourceRecords
-    .filter((source) => source.case_id === caseRecord.id)
-    .sort((a, b) => String(b.created_date).localeCompare(String(a.created_date)))[0];
+  const latestSource = latestAiSourceForCase(caseRecord.id);
   const analysis = latestSource?.analysis_summary;
+  const uploadedCount = aiUploadsForCase(caseRecord.id).length;
   return `
-    <section class="ai-workspace">
-      <div class="ai-chat-panel">
-        <div class="ai-chat-header">
-          <div class="ai-orb">AI</div>
-          <div>
-            <h3>BankManager.ai</h3>
-            <p>Turns messy enquiries, lender replies and documents into structured finance cases.</p>
-          </div>
+    <section class="bank-ai-shell ${analysis ? "has-analysis" : "is-empty"}">
+      <div class="bank-ai-header">
+        <div class="ai-orb">AI</div>
+        <div>
+          <h2>BankManager.ai</h2>
+          <p>Drop files, paste an email, or tell me what you know. I'll work out the next step.</p>
         </div>
-        <div class="chat-thread">
-          <div class="ai-message user-message">
-            <strong>Start with anything you have</strong>
-            <p>Paste an email, lender reply, WhatsApp notes, term sheet or describe the case.</p>
-          </div>
-          ${analysis ? `
-            <div class="ai-message assistant-message">
-              <strong>I think this is a ${escapeHtml(analysis.likely_product)} enquiry.</strong>
-              <p>I found borrower, loan and security signals. I am missing ${analysis.missing_information.map(escapeHtml).join(", ") || "no key items"}.</p>
-              <div class="quick-chip-row">
-                <span>Suggested product: ${escapeHtml(analysis.likely_product)}</span>
-                <span>${reviews.length} review fields</span>
-                <span>Human approval required</span>
-              </div>
-            </div>
-          ` : `
-            <div class="ai-message assistant-message">
-              <strong>Ready when you are.</strong>
-              <p>Paste the enquiry below and I will extract client, loan, security, missing information and suggested next actions.</p>
-            </div>
-          `}
-        </div>
-        <form class="ai-compose" data-form="ai-brain-dump" data-case-id="${valueAttr(caseRecord.id)}">
-          <textarea name="brain_dump" placeholder="Paste an email, lender reply, WhatsApp notes, term sheet or describe the case..."></textarea>
-          <div class="ai-compose-footer">
-            <div class="quick-chip-row">
-              <button class="chip-button" type="button">Upload files</button>
-              <a class="chip-button" href="/cases/${caseRecord.id}/client-requests" data-link>Draft client request</a>
-              <a class="chip-button" href="/cases/${caseRecord.id}/credit-paper" data-link>Prepare credit paper</a>
-              <a class="chip-button" href="/cases/${caseRecord.id}/source-log" data-link>Source log</a>
-            </div>
-            <button class="button primary" type="submit">Analyse</button>
-          </div>
-        </form>
       </div>
-      <aside class="ai-side-panel">
-        <div class="section-heading">
-          <div><h3>Recommended next step</h3><p>One clear action from the assistant.</p></div>
-        </div>
-        ${analysis ? `
-          <div class="next-action-card">
-            <span class="mini-icon">RQ</span>
+      <div class="ai-context-bar">
+        <span>${fieldStatusBadge("Attached to this case")}</span>
+        <strong>${escapeHtml(caseRecord.case_reference)}</strong>
+        <span>${escapeHtml(caseParty(caseRecord)?.name || "Client TBC")}</span>
+      </div>
+      <div class="bank-ai-chat">
+        ${analysis ? renderAiAnalysisResult(caseRecord, latestSource, reviews) : renderAiEmptyState()}
+      </div>
+      <form class="bank-ai-compose" data-form="ai-brain-dump" data-case-id="${valueAttr(caseRecord.id)}">
+        <input class="sr-only" type="file" multiple data-ai-file-input="${valueAttr(caseRecord.id)}" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.msg,.eml" />
+        <div class="ai-drop-zone" data-ai-drop-zone data-case-id="${valueAttr(caseRecord.id)}">
+          <div class="ai-drop-heading">
             <div>
-              <strong>Draft client request</strong>
-              <p>Ask for ${analysis.missing_information.slice(0, 3).map(escapeHtml).join(", ") || "remaining evidence"}.</p>
+              <strong>Drop files, paste an email, or tell BankManager.ai what you know.</strong>
+              <span>PDFs, Word, Excel, CSV, images, email files, term sheets, portfolios, appraisals, planning documents and bank statements are ready as placeholder metadata for MVP.</span>
             </div>
+            <button class="button" type="button" data-action="pick-ai-files" data-case-id="${valueAttr(caseRecord.id)}">Upload</button>
           </div>
-          <a class="button primary full-width" href="/cases/${caseRecord.id}/client-requests" data-link>Draft client request</a>
-          <div class="mini-list">
-            <strong>Suggested client questions</strong>
-            ${analysis.suggested_questions.map((question) => `<span>${escapeHtml(question)}</span>`).join("")}
+          ${renderAiFileChips(caseRecord.id)}
+          <textarea name="brain_dump" placeholder="Paste a client email, lender reply, WhatsApp notes, term sheet or case summary..."></textarea>
+          <div class="ai-prompt-hints" aria-label="Example prompts">
+            <span>I have a new enquiry</span>
+            <span>I have lender terms</span>
+            <span>I want to compare quotes</span>
+            <span>I need missing info</span>
           </div>
-        ` : `
-          <div class="next-action-card">
-            <span class="mini-icon">AN</span>
-            <div>
-              <strong>Analyse enquiry</strong>
-              <p>Run extraction to create reviewable suggestions.</p>
-            </div>
-          </div>
-        `}
-        <div class="mini-list">
-          <strong>Upload placeholders</strong>
-          ${["PDFs", "Word documents", "Excel portfolios", "lender emails", "term sheets", "images", "bank statements", "development appraisals"].map((documentType) => `<span>${escapeHtml(documentType)}</span>`).join("")}
         </div>
-      </aside>
+        <div class="bank-ai-submit-row">
+          <span>${uploadedCount ? `${uploadedCount} file${uploadedCount === 1 ? "" : "s"} ready for analysis` : "BankManager.ai can read enquiries, lender terms, documents and portfolios, then suggest what to do next."}</span>
+          <button class="button primary" type="submit">Analyse</button>
+        </div>
+      </form>
     </section>
     ${analysis ? `
-      <section class="surface-panel">
+      <section class="surface-panel" id="review-suggestions">
         <div class="section-heading">
-          <div><h3>AI response summary</h3><p>Suggested product, extracted data and flags remain broker-editable.</p></div>
+          <div>
+            <h3>Review suggested information</h3>
+            <p>Suggested fields are not saved as confirmed data until the broker confirms, edits or rejects them.</p>
+          </div>
         </div>
-        <div class="case-metric-row compact-row">
-          <div class="metric"><span>Product</span><strong>${escapeHtml(analysis.likely_product)}</strong><small>Suggested only</small></div>
-          <div class="metric"><span>Client details</span><strong>${reviews.filter((review) => review.entity_type === "ApplicationParty").length}</strong><small>Extracted fields</small></div>
-          <div class="metric"><span>Loan/security</span><strong>${reviews.filter((review) => review.entity_type === "Case" || review.entity_type === "PropertySecurity").length}</strong><small>Review rows</small></div>
-          <div class="metric"><span>Regulatory flags</span><strong>${analysis.missing_information.some((item) => /regulated|consent/i.test(item)) ? "Review" : "None"}</strong><small>Broker decision required</small></div>
-        </div>
+        ${reviews.length ? renderReviewGroups(reviews) : `<div class="empty-state">No extracted fields yet. Add more information and run analysis again.</div>`}
       </section>
     ` : ""}
-    <section class="surface-panel">
-      <div class="section-heading">
-        <div>
-          <h3>Review AI/API Suggestions</h3>
-          <p>Grouped by case area. Confirmed fields are not updated until the broker approves them.</p>
-        </div>
-      </div>
-      ${reviews.length ? renderReviewGroups(reviews) : `<div class="empty-state">Run analysis to create extraction review rows.</div>`}
-    </section>
   `;
+}
+
+function renderAiEmptyState() {
+  const examples = [
+    "Client needs bridging finance for a purchase completing next week...",
+    "Here are three lender terms - compare them for the client...",
+    "Upload this development appraisal and tell me what is missing..."
+  ];
+  return `
+    <div class="ai-empty-state">
+      <div class="ai-message assistant-message">
+        <strong>Start with anything</strong>
+        <p>Paste a client email, upload lender terms, drop a portfolio or describe the case. BankManager.ai will structure it for you.</p>
+      </div>
+      <div class="ai-example-grid">
+        ${examples.map((example) => `<span>${escapeHtml(example)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderAiAnalysisResult(caseRecord, source, reviews) {
+  const analysis = source.analysis_summary;
+  const found = [
+    ["Likely product", analysis.likely_product],
+    ["Borrower", analysisSuggestionValue(analysis, "name") || caseParty(caseRecord)?.name || "To confirm"],
+    ["Loan amount", analysisSuggestionValue(analysis, "loan_amount_requested") ? formatMoney(analysisSuggestionValue(analysis, "loan_amount_requested")) : formatMoney(caseRecord.loan_amount_requested)],
+    ["Security", analysisSuggestionValue(analysis, "security_address") || primarySecurity(caseRecord)?.security_address || caseRecord.security_address_headline || "To confirm"],
+    ["Key documents detected", [...(analysis.detected_documents || []), ...(source.attachments || []).map((file) => file.name)].slice(0, 4).join(", ") || "None detected yet"]
+  ];
+  const missing = analysis.missing_information || [];
+  return `
+    <div class="ai-message user-message">
+      <strong>You gave me</strong>
+      <p>${escapeHtml(source.original_content).slice(0, 320)}${String(source.original_content || "").length > 320 ? "..." : ""}</p>
+      ${(source.attachments || []).length ? `<div class="ai-file-chip-row compact">${(source.attachments || []).map((file) => `<span class="ai-file-chip"><span class="mini-icon">FL</span><span><strong>${escapeHtml(file.name)}</strong><small>${escapeHtml(file.type || "File")}</small></span></span>`).join("")}</div>` : ""}
+    </div>
+    <div class="ai-message assistant-message ai-response-card">
+      <strong>I have reviewed the information.</strong>
+      <p>This appears to be a ${escapeHtml(analysis.likely_product)} enquiry. I found enough detail to structure the case, but ${missing.length ? `there are ${missing.length} item${missing.length === 1 ? "" : "s"} missing before lender submission.` : "I do not see any major missing items from this first pass."}</p>
+    </div>
+    <div class="ai-result-grid">
+      <article class="ai-result-card">
+        <h3>What I found</h3>
+        <ul>${found.map(([label, value]) => `<li><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "To confirm")}</strong></li>`).join("")}</ul>
+      </article>
+      <article class="ai-result-card">
+        <h3>What is missing</h3>
+        <ul>${missing.length ? missing.map((item) => `<li><span>Missing</span><strong>${escapeHtml(item)}</strong></li>`).join("") : `<li><span>Status</span><strong>No major missing items found</strong></li>`}</ul>
+      </article>
+      <article class="ai-result-card recommended">
+        <h3>Recommended next step</h3>
+        <p>${escapeHtml(recommendedAiStep(analysis))}</p>
+        <div class="contextual-action-grid">
+          ${renderContextualAiActions(caseRecord, source, analysis, reviews)}
+        </div>
+      </article>
+    </div>
+  `;
+}
+
+function recommendedAiStep(analysis) {
+  const context = analysis?.detected_context || "new_enquiry";
+  if (context === "lender_terms") return "Extract the lender terms and compare them against the current quote options.";
+  if (context === "lender_reply") return "Update the lender submission and decide whether the client needs to provide more information.";
+  if (context === "documents") return "Attach the documents to the case, extract key data and update the document checklist.";
+  if ((analysis?.missing_information || []).length) return "Create a draft case and prepare a client missing information request.";
+  return "Create or update the draft case, then review the suggested information.";
+}
+
+function renderContextualAiActions(caseRecord, source, analysis, reviews) {
+  const context = analysis?.detected_context || "new_enquiry";
+  const base = [
+    `<button class="button primary" type="button" data-action="attach-ai-to-case" data-source-id="${valueAttr(source.id)}">Attach to this case</button>`,
+    `<button class="button" type="button" data-action="create-case-from-ai" data-source-id="${valueAttr(source.id)}">Create draft case</button>`,
+    `<a class="button" href="#review-suggestions" data-link>Review extracted details</a>`
+  ];
+  const actions = {
+    new_enquiry: [
+      ...base,
+      `<a class="button" href="/cases/${caseRecord.id}/client-requests" data-link>Draft client request</a>`,
+      `<button class="button" type="button" data-action="focus-ai-input" data-case-id="${valueAttr(caseRecord.id)}">Add more information</button>`
+    ],
+    missing_information: [
+      `<a class="button primary" href="/cases/${caseRecord.id}/client-requests" data-link>Draft missing information email</a>`,
+      `<button class="button" type="button" data-action="create-case-from-ai" data-source-id="${valueAttr(source.id)}">Create draft case</button>`,
+      `<a class="button" href="/cases/${caseRecord.id}/client-requests" data-link>Create client task list</a>`,
+      `<button class="button" type="button" data-action="focus-ai-input" data-case-id="${valueAttr(caseRecord.id)}">Ask broker to complete</button>`,
+      `<a class="button" href="/cases/${caseRecord.id}/source-log" data-link>Mark as not required later</a>`
+    ],
+    lender_terms: [
+      `<a class="button primary" href="/cases/${caseRecord.id}/quote-comparison" data-link>Add quote</a>`,
+      `<a class="button" href="/cases/${caseRecord.id}/quote-comparison" data-link>Compare quotes</a>`,
+      `<a class="button" href="#review-suggestions" data-link>Extract lender terms</a>`,
+      `<a class="button" href="/cases/${caseRecord.id}/quote-comparison" data-link>Draft client explanation</a>`
+    ],
+    documents: [
+      `<button class="button primary" type="button" data-action="attach-ai-to-case" data-source-id="${valueAttr(source.id)}">Attach to case</button>`,
+      `<a class="button" href="#review-suggestions" data-link>Extract key data</a>`,
+      `<a class="button" href="/cases/${caseRecord.id}/documents" data-link>Add to document checklist</a>`,
+      `<a class="button" href="/cases/${caseRecord.id}/client-requests" data-link>Ask client to confirm</a>`
+    ],
+    lender_reply: [
+      `<a class="button primary" href="/cases/${caseRecord.id}/lender-submissions" data-link>Update lender submission</a>`,
+      `<a class="button" href="#review-suggestions" data-link>Extract response</a>`,
+      `<a class="button" href="/cases/${caseRecord.id}/quote-comparison" data-link>Add quote</a>`,
+      `<a class="button" href="/cases/${caseRecord.id}/client-requests" data-link>Request more info from client</a>`
+    ]
+  };
+  return (actions[context] || actions.new_enquiry).join("");
 }
 
 function reviewSectionName(review) {
@@ -1435,6 +1576,7 @@ function renderSourceLog(caseRecord) {
             <p>${escapeHtml(source.original_content)}</p>
             <dl class="kv">
               <dt>Extracted</dt><dd>${(source.extracted_fields || []).map(escapeHtml).join(", ") || "None"}</dd>
+              <dt>Files</dt><dd>${(source.attachments || []).map((file) => escapeHtml(`${file.name} (${file.type || "File"})`)).join(", ") || "None"}</dd>
               <dt>Approved</dt><dd>${(source.broker_approved_fields || []).map(escapeHtml).join(", ") || "None"}</dd>
               <dt>Rejected</dt><dd>${(source.rejected_fields || []).map(escapeHtml).join(", ") || "None"}</dd>
               <dt>Created</dt><dd>${escapeHtml(dateOnly(source.created_date))}</dd>
@@ -2838,6 +2980,27 @@ document.addEventListener("click", (event) => {
     navigate("/login");
     return;
   }
+  if (action === "pick-ai-files") {
+    document.querySelector(`[data-ai-file-input="${CSS.escape(button.dataset.caseId)}"]`)?.click();
+    return;
+  }
+  if (action === "remove-ai-file") {
+    removeAiFile(button.dataset.caseId, button.dataset.fileId);
+    render();
+    return;
+  }
+  if (action === "attach-ai-to-case") {
+    handleAttachAiToCase(button.dataset.sourceId);
+    return;
+  }
+  if (action === "create-case-from-ai") {
+    handleCreateCaseFromAi(button.dataset.sourceId);
+    return;
+  }
+  if (action === "focus-ai-input") {
+    document.querySelector(`[data-form="ai-brain-dump"][data-case-id="${CSS.escape(button.dataset.caseId)}"] textarea`)?.focus();
+    return;
+  }
   if (["approve-ai", "edit-ai", "reject-ai", "ask-client-ai", "not-sure-ai"].includes(action)) {
     handleAiReviewAction(action, button.dataset.reviewId);
     return;
@@ -2869,6 +3032,36 @@ document.addEventListener("click", (event) => {
   if (action === "mark-doc") {
     handleMarkDoc(button.dataset.checkId, button.dataset.status);
   }
+});
+
+document.addEventListener("change", (event) => {
+  const input = event.target.closest("[data-ai-file-input]");
+  if (!input) return;
+  addAiFilesForCase(input.dataset.aiFileInput, input.files || []);
+  input.value = "";
+  render();
+});
+
+document.addEventListener("dragover", (event) => {
+  const zone = event.target.closest("[data-ai-drop-zone]");
+  if (!zone) return;
+  event.preventDefault();
+  zone.classList.add("drag-over");
+});
+
+document.addEventListener("dragleave", (event) => {
+  const zone = event.target.closest("[data-ai-drop-zone]");
+  if (!zone) return;
+  zone.classList.remove("drag-over");
+});
+
+document.addEventListener("drop", (event) => {
+  const zone = event.target.closest("[data-ai-drop-zone]");
+  if (!zone) return;
+  event.preventDefault();
+  zone.classList.remove("drag-over");
+  addAiFilesForCase(zone.dataset.caseId, event.dataTransfer?.files || []);
+  render();
 });
 
 document.addEventListener("submit", (event) => {
@@ -2986,8 +3179,17 @@ function handleNewCase(data) {
 
 function handleAiBrainDump(caseId, data) {
   const text = data.brain_dump || "";
-  if (!text.trim()) return;
-  const analysis = analyseBrainDump(text);
+  const uploads = aiUploadsForCase(caseId);
+  if (!text.trim() && !uploads.length) {
+    notify("Add notes or files before analysis");
+    return;
+  }
+  const uploadText = uploads.map((file) => `${file.name} ${file.type}`).join("\n");
+  const analysis = analyseBrainDump([text, uploadText].filter(Boolean).join("\n"));
+  if (uploads.length) {
+    analysis.detected_context = analysis.detected_context === "new_enquiry" ? "documents" : analysis.detected_context;
+    analysis.detected_documents = Array.from(new Set([...(analysis.detected_documents || []), ...uploads.map((file) => file.name)]));
+  }
   const caseRecord = getCase(caseId);
   const sourceId = createId("source");
 
@@ -2997,9 +3199,9 @@ function handleAiBrainDump(caseId, data) {
     client_id: caseRecord.client_id,
     broker_id: caseRecord.broker_id,
     brokerage_id: caseRecord.brokerage_id,
-    input_type: "Brain dump",
-    original_content: text,
-    attachments: [],
+    input_type: uploads.length ? "Chat and uploaded files" : "Chat / pasted notes",
+    original_content: text || `Files uploaded for analysis: ${uploads.map((file) => file.name).join(", ")}`,
+    attachments: uploads,
     source_file_email_reference: "",
     ai_analysis_status: "Broker review required",
     extracted_fields: analysis.suggestions.map((item) => item.field_key),
@@ -3025,10 +3227,132 @@ function handleAiBrainDump(caseId, data) {
 
   caseRecord.status = "AI extracted draft";
   caseRecord.missing_information = Array.from(new Set([...(caseRecord.missing_information || []), ...analysis.missing_information]));
-  addAudit(caseId, "AI analysis run", "BrainDumpSourceRecord", sourceId, "BankManager.ai placeholder analysis created extraction review rows.");
+  addAudit(caseId, "AI analysis run", "BrainDumpSourceRecord", sourceId, "BankManager.ai analysed chat input and file metadata, then created extraction review rows.");
   notify("AI analysis ready for review");
   saveState();
   render();
+}
+
+function handleAttachAiToCase(sourceId) {
+  const source = state.brainDumpSourceRecords.find((item) => item.id === sourceId);
+  if (!source) return;
+  addAudit(source.case_id, "AI source attached to case", "BrainDumpSourceRecord", source.id, "BankManager.ai source confirmed as attached to this case.");
+  notify("Analysis attached to this case");
+  saveState();
+  render();
+}
+
+function handleCreateCaseFromAi(sourceId) {
+  const source = state.brainDumpSourceRecords.find((item) => item.id === sourceId);
+  if (!source?.analysis_summary) return;
+  const analysis = source.analysis_summary;
+  const user = currentUser();
+  const product = state.products.find((item) => item.product_name === analysis.likely_product) || state.products.find((item) => item.id === "prod-bridging");
+  const caseId = createId("case");
+  const partyId = createId("party");
+  const securityId = createId("security");
+  const copiedSourceId = createId("source");
+  const borrowerName = analysisSuggestionValue(analysis, "name") || "Borrower TBC";
+  const securityAddress = analysisSuggestionValue(analysis, "security_address") || "Security TBC";
+  const caseReference = `LT-AI-${String(state.cases.length + 1).padStart(4, "0")}`;
+
+  state.cases.unshift({
+    id: caseId,
+    case_reference: caseReference,
+    source_brand: "BankManager.ai",
+    source_app: "AI chat workspace",
+    source_lender_id: "",
+    source_application_link: "",
+    brokerage_id: user?.brokerage_id || "brokerage-uka",
+    brokerage_organisation_id: user?.organisation_id || "org-uka",
+    broker_id: user?.broker_id || "broker-max",
+    broker_user_id: user?.id || "user-broker-max",
+    client_id: partyId,
+    client_user_id: "",
+    client_organisation_id: "",
+    assigned_user_ids: [user?.id || "user-broker-max"],
+    assigned_lender_ids: [],
+    assigned_lender_user_ids: [],
+    product_id: product?.id || "prod-bridging",
+    case_type: analysis.likely_product,
+    status: "AI extracted draft",
+    loan_amount_requested: parseNumber(analysisSuggestionValue(analysis, "loan_amount_requested")),
+    security_address_headline: securityAddress,
+    submission_readiness_score: 24,
+    regulated_status: "Unknown / TBC",
+    commercial_agreement_status: "Draft",
+    created_date: todayIso(),
+    updated_date: todayIso(),
+    summary: `Created from BankManager.ai chat analysis. ${analysis.lender_summary || ""}`.trim(),
+    missing_information: analysis.missing_information || [],
+    lenders_already_approached: []
+  });
+
+  state.applicationParties.push({
+    id: partyId,
+    case_id: caseId,
+    applicant_type: "Limited Company",
+    name: borrowerName,
+    company_number: "",
+    role: "Borrower",
+    email: analysisSuggestionValue(analysis, "email"),
+    phone: analysisSuggestionValue(analysis, "phone"),
+    notes: "Created from BankManager.ai analysis. Broker review required."
+  });
+
+  state.propertySecurities.push({
+    id: securityId,
+    case_id: caseId,
+    security_address: securityAddress,
+    title_number: "",
+    owner: borrowerName,
+    tenure: "TBC",
+    security_type: analysis.likely_product === "Development Finance" ? "Development Site" : "TBC",
+    current_use: "",
+    proposed_use: "",
+    current_value: parseNumber(analysisSuggestionValue(analysis, "current_value")),
+    purchase_price: 0,
+    value_90_day: 0,
+    value_180_day: 0,
+    gdv: parseNumber(analysisSuggestionValue(analysis, "gdv")),
+    existing_first_charge: false,
+    existing_second_charge: false,
+    proposed_charge_type: "First charge",
+    existing_lender: "",
+    existing_balance: 0,
+    consent_required: false,
+    consent_obtained: false,
+    valuation_status: "Required",
+    notes: "AI suggested. Broker review required."
+  });
+
+  state.brainDumpSourceRecords.unshift({
+    ...source,
+    id: copiedSourceId,
+    case_id: caseId,
+    client_id: partyId,
+    broker_id: user?.broker_id || "broker-max",
+    brokerage_id: user?.brokerage_id || "brokerage-uka",
+    broker_approved_fields: [],
+    rejected_fields: [],
+    created_date: todayIso()
+  });
+
+  (analysis.suggestions || []).forEach((suggestion) => {
+    state.aiExtractionReviews.unshift({
+      id: createId("review"),
+      case_id: caseId,
+      source_record_id: copiedSourceId,
+      ...suggestion,
+      broker_value: suggestion.suggested_value,
+      created_date: todayIso()
+    });
+  });
+
+  addAudit(caseId, "Case creation", "Case", caseId, `${caseReference} created from BankManager.ai analysis.`);
+  notify("Draft case created from BankManager.ai");
+  saveState();
+  navigate(`/cases/${caseId}/ai`);
 }
 
 function handleAiReviewAction(action, reviewId) {
