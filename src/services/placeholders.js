@@ -88,6 +88,9 @@ export function analyseBrainDump(text) {
   const lower = text.toLowerCase();
   const isDevelopment = /development|gdv|planning|build|airspace|conversion|cost plan/.test(lower);
   const isBridge = /bridge|bridging|completion|auction|refurb/.test(lower);
+  const isLenderTerms = /term sheet|terms|rate|arrangement fee|exit fee|ltv|personal guarantee|pg|annual cost|monthly cost/.test(lower);
+  const isLenderReply = /decline|accepted|acceptable|approved|decision pending|refer to credit|request more information|more info|indicative terms/.test(lower);
+  const hasDocumentLanguage = /pdf|docx|xlsx|csv|portfolio|schedule|appraisal|planning|bank statement|term sheet|valuation|email attachment|\.msg/.test(lower);
   const product = isDevelopment ? "Development Finance" : isBridge ? "Bridging Finance" : "Bridging Finance";
   const loanAmount = extractMoney(text, ["loan", "facility", "debt", "net loan", "funding", "raise"]);
   const gdv = extractMoney(text, ["gdv", "gross development value"]);
@@ -106,6 +109,22 @@ export function analyseBrainDump(text) {
   if (!email) missing.push("Client email");
   if (/residential|home|family|occup/i.test(text)) missing.push("Regulated status confirmation");
   if (!/consent/i.test(text)) missing.push("Consent to share with lenders");
+
+  const detectedContext = isLenderReply ? "lender_reply"
+    : isLenderTerms ? "lender_terms"
+      : missing.length ? "missing_information"
+        : hasDocumentLanguage ? "documents"
+          : "new_enquiry";
+
+  const detectedDocuments = [
+    /term sheet|terms/i.test(text) ? "Term sheet" : "",
+    /portfolio|schedule/i.test(text) ? "Portfolio schedule" : "",
+    /appraisal|cost plan/i.test(text) ? "Development appraisal" : "",
+    /planning/i.test(text) ? "Planning documents" : "",
+    /bank statement/i.test(text) ? "Bank statements" : "",
+    /valuation/i.test(text) ? "Valuation" : "",
+    /\.msg|lender email|client email/i.test(text) ? "Email file" : ""
+  ].filter(Boolean);
 
   const suggestions = [
     {
@@ -192,6 +211,8 @@ export function analyseBrainDump(text) {
 
   return {
     likely_product: product,
+    detected_context: detectedContext,
+    detected_documents: detectedDocuments,
     missing_information: missing,
     suggested_questions: [
       "Can you confirm the full borrower structure and beneficial owners?",
