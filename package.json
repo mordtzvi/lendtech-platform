@@ -8,5 +8,8 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/serve.mjs",
     "start": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "base44": "^0.0.56"
   }
 }
