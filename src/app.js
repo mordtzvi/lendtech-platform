@@ -452,6 +452,38 @@ function renderFieldStatusRow(statuses = ["AI suggested", "API suggested, future
   return `<div class="field-status-row">${statuses.map(fieldStatusBadge).join("")}</div>`;
 }
 
+function renderBankManagerDropBox(caseId, options = {}) {
+  const uploads = aiUploadsForCase(caseId);
+  const prompt = options.prompt || "Paste a client email, lender reply, WhatsApp notes, term sheet or case summary...";
+  const name = options.textareaName || "brain_dump";
+  const showTextarea = options.showTextarea !== false;
+  const compact = options.compact ? " compact-dropbox" : "";
+  return `
+    <input class="sr-only" type="file" multiple data-ai-file-input="${valueAttr(caseId)}" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.msg,.eml" />
+    <div class="ai-drop-zone bankmanager-dropbox${compact}" data-ai-drop-zone data-case-id="${valueAttr(caseId)}">
+      <div class="ai-drop-heading">
+        <div>
+          <span class="eyebrow">BankManager.ai Drop Box</span>
+          <strong>${escapeHtml(options.title || "Drop files, emails, screenshots or notes here.")}</strong>
+          <span>${escapeHtml(options.subtitle || "BankManager.ai will work out what this relates to, create a source record and suggest the next step.")}</span>
+        </div>
+        <button class="button" type="button" data-action="pick-ai-files" data-case-id="${valueAttr(caseId)}">Upload</button>
+      </div>
+      <div class="dropbox-input-types">
+        ${["Client emails", "Lender emails", "PDFs", "Word", "Excel", "Screenshots", "Photos", "Term sheets", "Portfolios", "Appraisals", "Notes"].map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+      ${renderAiFileChips(caseId)}
+      ${showTextarea ? `<textarea name="${valueAttr(name)}" placeholder="${valueAttr(prompt)}">${escapeHtml(options.value || "")}</textarea>` : ""}
+      <div class="dropbox-next-actions" aria-label="BankManager.ai possible actions">
+        ${["Analyse and create case", "Add to existing case", "Extract lender quote", "Extract borrower details", "Extract missing information", "Prepare client request", "Prepare lender summary", "Compare offers", "Store as document only"].map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+      <div class="dropbox-source-note">
+        ${fieldStatusBadge("Source record")} ${fieldStatusBadge("Broker approval required")} ${fieldStatusBadge("Manual override available")}
+      </div>
+    </div>
+  `;
+}
+
 function render() {
   const path = window.location.pathname;
   const external = path.startsWith("/apply/") || path.startsWith("/lender-response/");
@@ -622,33 +654,31 @@ function navSectionsForUser(user = currentUser()) {
   const caseId = caseRecord?.id || "case-hendon-dev";
   const group = userRoleGroup(user);
   if (group === "platform") {
-    const controlLinks = [
-      ["/admin/products", "PR", "Products"],
-      ["/admin/market-intelligence", "MI", "Market intel"],
-      ["/admin/commissions", "CM", "Commissions"],
-      ["/admin/audit", "AU", "Audit"],
-      ...(isDeveloperAdmin(user) ? [["/github-sync", "GH", "GitHub sync"]] : []),
-      ["/admin/settings", "ST", "Settings"]
-    ];
     return [
-      ["Platform", [
+      ["Workspace", [
         ["/dashboard", "DB", "Dashboard"],
         ["/cases", "CS", "Cases"],
         [`/cases/${caseId}/ai`, "AI", "BankManager.ai"],
+        ["/admin/clients", "CL", "Clients"],
+        ["/admin/lenders", "LN", "Lenders"],
+        ["/admin/commissions", "CM", "Commissions"]
+      ]],
+      ["Admin", [
         ["/admin/brokerages", "BG", "Brokerages"],
         ["/admin/brokers", "BK", "Brokers"],
-        ["/admin/clients", "CL", "Clients"],
-        ["/admin/lenders", "LN", "Lenders"]
-      ]],
-      ["Control", controlLinks]
+        ["/admin/products", "PR", "Products"],
+        ["/admin/market-intelligence", "MI", "Market intel"],
+        ["/admin/audit", "AU", "Audit"],
+        ...(isDeveloperAdmin(user) ? [["/github-sync", "GH", "GitHub sync"]] : []),
+        ["/admin/settings", "ST", "Settings"]
+      ]]
     ];
   }
   if (group === "brokerage_admin") {
     return [
-      ["Brokerage", [
+      ["Workspace", [
         ["/dashboard", "DB", "Dashboard"],
         ["/cases", "CS", "Cases"],
-        ["/cases/new", "+", "New case"],
         [`/cases/${caseId}/ai`, "AI", "BankManager.ai"],
         ["/profiles/client", "CL", "Clients"],
         ["/profiles/lender", "LN", "Lenders"],
@@ -663,10 +693,9 @@ function navSectionsForUser(user = currentUser()) {
   }
   if (group === "broker" || group === "packaging") {
     return [
-      ["Broker", [
+      ["Workspace", [
         ["/dashboard", "DB", "Dashboard"],
         ["/cases", "CS", "Cases"],
-        ["/cases/new", "+", "New case"],
         [`/cases/${caseId}/ai`, "AI", "BankManager.ai"],
         ["/profiles/client", "CL", "Clients"],
         ["/profiles/lender", "LN", "Lenders"],
@@ -874,18 +903,17 @@ function renderDashboard() {
         <div class="eyebrow">BankManager.ai</div>
         <h2>BankManager.ai</h2>
         <p>Drop files, paste an email, or tell me what you know. I'll work out the next step.</p>
-        <div class="ai-prompt-shell">
-          <textarea aria-label="BankManager.ai dashboard prompt" placeholder="Paste a client email, lender reply, WhatsApp notes, term sheet or case summary..."></textarea>
-          <div class="ai-prompt-actions">
-            <a class="button soft" href="/cases/${aiCase?.id || "case-hendon-dev"}/ai" data-link>Upload</a>
-            <a class="button primary" href="/cases/${aiCase?.id || "case-hendon-dev"}/ai" data-link>Analyse</a>
-          </div>
-        </div>
-        <div class="ai-prompt-hints">
-          <span>I have a new enquiry</span>
-          <span>I have lender terms</span>
-          <span>I want to compare quotes</span>
-          <span>I need missing info</span>
+        ${renderBankManagerDropBox(aiCase?.id || "case-hendon-dev", {
+          compact: true,
+          textareaName: "dashboard_brain_dump",
+          title: "Drop files, emails, screenshots or notes here.",
+          subtitle: "I will decide whether this is a new enquiry, lender reply, term sheet, missing-info item or document upload."
+        })}
+        <div class="ai-prompt-actions dashboard-ai-actions">
+          <a class="button soft" href="/cases/${aiCase?.id || "case-hendon-dev"}/ai" data-link>Upload</a>
+          <a class="button primary" href="/cases/${aiCase?.id || "case-hendon-dev"}/ai" data-link>Analyse</a>
+          <a class="button soft" href="/cases/new" data-link>Create case</a>
+          <a class="button soft" href="/cases/${aiCase?.id || "case-hendon-dev"}/client-requests" data-link>Draft request</a>
         </div>
       </div>
     </section>
@@ -975,33 +1003,41 @@ function renderCases() {
   const cases = visibleCases();
   const canCreate = isPlatformUser() || isBrokerageUser();
   return `
-    <section class="band">
-      <div class="band-header">
+    <section class="surface-panel">
+      <div class="section-heading">
         <div>
           <h3>Case list</h3>
-          <p>Broker-facing case pipeline for bridging, development and future finance products.</p>
+          <p>Broker-facing pipeline without the spreadsheet feel. Open a case or continue the next action.</p>
         </div>
         ${canCreate ? `<a class="button primary" href="/cases/new" data-link>Create case</a>` : ""}
       </div>
-      <div class="band-body table-wrap">
-        <table>
-          <thead><tr><th>Reference</th><th>Client</th><th>Product</th><th>Loan</th><th>Regulated status</th><th>Status</th></tr></thead>
-          <tbody>
-            ${cases.map((caseRecord) => {
-              const party = state.applicationParties.find((item) => item.id === caseRecord.client_id);
-              return `
-                <tr>
-                  <td><a href="/cases/${caseRecord.id}" data-link><strong>${escapeHtml(caseRecord.case_reference)}</strong></a><br><span class="subtle">${escapeHtml(caseRecord.security_address_headline)}</span></td>
-                  <td>${escapeHtml(party?.name || "TBC")}</td>
-                  <td>${escapeHtml(caseRecord.case_type)}</td>
-                  <td>${formatMoney(caseRecord.loan_amount_requested)}</td>
-                  <td>${statusPill(caseRecord.regulated_status)}</td>
-                  <td>${statusPill(caseRecord.status)}</td>
-                </tr>
-              `;
-            }).join("") || `<tr><td colspan="6">No cases are visible to this demo user.</td></tr>`}
-          </tbody>
-        </table>
+      <div class="case-card-grid">
+        ${cases.map((caseRecord) => {
+          const party = state.applicationParties.find((item) => item.id === caseRecord.client_id);
+          const action = nextBestAction(caseRecord);
+          return `
+            <article class="case-list-card">
+              <div class="case-list-head">
+                <div>
+                  <a href="/cases/${caseRecord.id}" data-link><strong>${escapeHtml(caseRecord.case_reference)}</strong></a>
+                  <p>${escapeHtml(party?.name || "Client TBC")}</p>
+                </div>
+                ${statusPill(caseRecord.status)}
+              </div>
+              <dl class="kv">
+                <dt>Product</dt><dd>${escapeHtml(caseRecord.case_type)}</dd>
+                <dt>Loan</dt><dd>${formatMoney(caseRecord.loan_amount_requested)}</dd>
+                <dt>Security</dt><dd>${escapeHtml(caseRecord.security_address_headline || "TBC")}</dd>
+                <dt>Compliance</dt><dd>${statusPill(caseRecord.regulated_status)}</dd>
+              </dl>
+              <div class="progress"><span style="width:${Number(caseRecord.submission_readiness_score || 0)}%;"></span></div>
+              <div class="case-list-footer">
+                <span>${caseRecord.submission_readiness_score || 0}% ready</span>
+                <a class="button compact" href="${valueAttr(action.href)}" data-link>${escapeHtml(action.label)}</a>
+              </div>
+            </article>
+          `;
+        }).join("") || `<div class="empty-state">No cases are visible to this demo user.</div>`}
       </div>
     </section>
   `;
@@ -1026,14 +1062,12 @@ function renderNewCase() {
           </div>
           ${renderFieldStatusRow(["AI suggested", "API suggested, future", "Needs review", "Confirmed by broker"])}
         </div>
-        <div class="dropzone">
-          <strong>Upload documents or paste notes</strong>
-          <span>PDFs, portfolios, lender emails and future Outlook/API sources will pre-fill the review screen. For MVP, paste notes below.</span>
-        </div>
-        <div class="field">
-          <label>Paste email or notes here</label>
-          <textarea class="large-input" name="summary" placeholder="Example: Development finance enquiry for an SPV. Loan around £4.5m, GDV £7.5m, security at Hendon Lane, planning pending..."></textarea>
-        </div>
+        ${renderBankManagerDropBox("new-case-draft", {
+          textareaName: "summary",
+          title: "Drop in what you have and create a draft case.",
+          subtitle: "Files, emails and pasted notes become a source record on the new case. Confirmed fields still require broker approval.",
+          prompt: "Example: Development finance enquiry for an SPV. Loan around £4.5m, GDV £7.5m, security at Hendon Lane, planning pending..."
+        })}
         <div class="guided-section">
           <div class="guided-heading">
             <h3>Suggested product</h3>
@@ -1090,11 +1124,16 @@ function renderCaseHeader(caseRecord, tab) {
   const tabs = [
     ["", "Overview"],
     ["ai", "AI Workspace"],
+    ["source-log", "Source Log"],
     ["applicants", "People"],
     ["security", "Security"],
-    ["development", "Loan"],
+    ["bridging", "Bridge"],
+    ["development", "Development"],
     ["documents", "Documents"],
+    ["client-requests", "Client Requests"],
     ["lender-search", "Lenders"],
+    ["lender-submissions", "Submissions"],
+    ["credit-paper", "Credit Paper"],
     ["quote-comparison", "Quotes"],
     ["compliance", "Compliance"],
     ["commission", "Commission"],
@@ -1301,6 +1340,30 @@ function addAiFilesForCase(caseId, files = []) {
   }));
   if (!additions.length) return;
   setAiUploadsForCase(caseId, [...existing, ...additions]);
+  const caseRecord = getCase(caseId);
+  if (caseRecord) {
+    const sourceId = createId("source");
+    state.brainDumpSourceRecords.unshift({
+      id: sourceId,
+      case_id: caseId,
+      client_id: caseRecord.client_id,
+      broker_id: caseRecord.broker_id,
+      brokerage_id: caseRecord.brokerage_id,
+      input_type: "BankManager.ai Drop Box upload",
+      original_content: `Files uploaded for BankManager.ai analysis: ${additions.map((file) => file.name).join(", ")}`,
+      attachments: additions,
+      source_file_email_reference: "BankManager.ai Drop Box",
+      ai_analysis_status: "Uploaded - awaiting analysis",
+      extracted_fields: [],
+      broker_approved_fields: [],
+      rejected_fields: [],
+      tasks_created: [],
+      emails_drafted: [],
+      emails_sent: [],
+      created_date: todayIso()
+    });
+    addAudit(caseId, "Drop Box upload", "BrainDumpSourceRecord", sourceId, `${additions.length} file${additions.length === 1 ? "" : "s"} added to BankManager.ai Drop Box.`);
+  }
   notify(`${additions.length} file${additions.length === 1 ? "" : "s"} attached for analysis`);
 }
 
@@ -1366,24 +1429,10 @@ function renderBankManager(caseRecord) {
         ${analysis ? renderAiAnalysisResult(caseRecord, latestSource, reviews) : renderAiEmptyState()}
       </div>
       <form class="bank-ai-compose" data-form="ai-brain-dump" data-case-id="${valueAttr(caseRecord.id)}">
-        <input class="sr-only" type="file" multiple data-ai-file-input="${valueAttr(caseRecord.id)}" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.msg,.eml" />
-        <div class="ai-drop-zone" data-ai-drop-zone data-case-id="${valueAttr(caseRecord.id)}">
-          <div class="ai-drop-heading">
-            <div>
-              <strong>Drop files, paste an email, or tell BankManager.ai what you know.</strong>
-              <span>PDFs, Word, Excel, CSV, images, email files, term sheets, portfolios, appraisals, planning documents and bank statements are ready as placeholder metadata for MVP.</span>
-            </div>
-            <button class="button" type="button" data-action="pick-ai-files" data-case-id="${valueAttr(caseRecord.id)}">Upload</button>
-          </div>
-          ${renderAiFileChips(caseRecord.id)}
-          <textarea name="brain_dump" placeholder="Paste a client email, lender reply, WhatsApp notes, term sheet or case summary..."></textarea>
-          <div class="ai-prompt-hints" aria-label="Example prompts">
-            <span>I have a new enquiry</span>
-            <span>I have lender terms</span>
-            <span>I want to compare quotes</span>
-            <span>I need missing info</span>
-          </div>
-        </div>
+        ${renderBankManagerDropBox(caseRecord.id, {
+          title: "Drop files, paste an email, or tell BankManager.ai what you know.",
+          subtitle: "On analysis I will suggest whether to create a case, attach to this case, extract lender terms, draft a client request or compare offers."
+        })}
         <div class="bank-ai-submit-row">
           <span>${uploadedCount ? `${uploadedCount} file${uploadedCount === 1 ? "" : "s"} ready for analysis` : "BankManager.ai can read enquiries, lender terms, documents and portfolios, then suggest what to do next."}</span>
           <button class="button primary" type="submit">Analyse</button>
@@ -1632,9 +1681,15 @@ function renderApplicants(caseRecord) {
       <aside class="band">
         <div class="band-header"><div><h3>Add party</h3><p>One-click roles become editable cards.</p></div></div>
         <form class="band-body" data-form="add-party" data-case-id="${valueAttr(caseRecord.id)}">
-          <div class="field"><label>Party type</label><select name="applicant_type">${optionList(partyTypes, "Director")}</select></div>
-          <div class="field"><label>Name</label><input name="name" placeholder="Name or company" required /></div>
-          <div class="field"><label>Email</label><input name="email" type="email" /></div>
+          <div class="guided-section">
+            <div class="guided-heading"><h3>Party type</h3>${fieldStatusBadge("Click to add")}</div>
+            ${renderOptionCards("applicant_type", partyTypes, "Director", { compact: true })}
+          </div>
+          <details class="manual-panel" open>
+            <summary>Add manual details</summary>
+            <div class="field" style="margin-top:14px;"><label>Name</label><input name="name" placeholder="Name or company" required /></div>
+            <div class="field"><label>Email</label><input name="email" type="email" /></div>
+          </details>
           <div class="actions" style="margin-top:14px;"><button class="button primary" type="submit">Add party</button></div>
         </form>
       </aside>
@@ -1656,14 +1711,22 @@ function renderApplicants(caseRecord) {
             </article>
           `).join("") || `<div class="empty-state">No people added yet.</div>`}
         </div>
-        <form class="form-grid three" data-form="add-person" data-case-id="${valueAttr(caseRecord.id)}" style="margin-top:16px;">
-          <div class="field"><label>Full legal name</label><input name="full_legal_name" required /></div>
-          <div class="field"><label>Role</label><select name="role">${optionList(["Director", "Shareholder", "Partner", "Trustee", "Guarantor", "Client contact", "Third-party security provider"], "Director")}</select></div>
-          <div class="field"><label>Ownership %</label><input name="ownership_percentage" inputmode="decimal" /></div>
-          <div class="field"><label>Email</label><input name="email" type="email" /></div>
-          <div class="field"><label>Phone</label><input name="phone" /></div>
-          <div class="field"><label>KYC/AML status</label><select name="kyc_aml_status">${optionList(["Not started", "Requested", "In review", "Complete"], "Not started")}</select></div>
-          <div class="actions"><button class="button primary" type="submit">Add person</button></div>
+        <form data-form="add-person" data-case-id="${valueAttr(caseRecord.id)}" style="margin-top:16px;">
+          <div class="guided-section">
+            <div class="guided-heading"><h3>Role type</h3>${fieldStatusBadge("Manual override")}</div>
+            ${renderOptionCards("role", ["Director", "Shareholder", "Partner", "Trustee", "Guarantor", "Client contact", "Third-party security provider"], "Director", { compact: true })}
+          </div>
+          <details class="manual-panel" open>
+            <summary>Manual person details</summary>
+            <div class="form-grid three" style="margin-top:14px;">
+              <div class="field"><label>Full legal name</label><input name="full_legal_name" required /></div>
+              <div class="field"><label>Ownership %</label><input name="ownership_percentage" inputmode="decimal" /></div>
+              <div class="field"><label>Email</label><input name="email" type="email" /></div>
+              <div class="field"><label>Phone</label><input name="phone" /></div>
+              <div class="field"><label>KYC/AML status</label><select name="kyc_aml_status">${optionList(["Not started", "Requested", "In review", "Complete"], "Not started")}</select></div>
+            </div>
+          </details>
+          <div class="actions" style="margin-top:14px;"><button class="button primary" type="submit">Add person</button></div>
         </form>
       </div>
     </section>
@@ -1678,15 +1741,26 @@ function renderSecurity(caseRecord) {
         <div><h3>Real estate security</h3><p>Multiple securities will be supported. MVP edits the primary security.</p></div>
       </div>
       <form class="band-body" data-form="save-security" data-case-id="${valueAttr(caseRecord.id)}" data-security-id="${valueAttr(security.id || "")}">
+        <div class="guided-section">
+          <div class="guided-heading"><h3>Security type</h3>${fieldStatusBadge("AI/API pre-fill ready")}</div>
+          ${renderOptionCards("security_type", securityTypeOptions, security.security_type || "Mixed Use", { compact: true })}
+        </div>
+        <div class="guided-section">
+          <div class="guided-heading"><h3>Charge type</h3>${fieldStatusBadge("Broker confirmed")}</div>
+          ${renderOptionCards("proposed_charge_type", chargeTypeOptions, security.proposed_charge_type || "First Charge", { compact: true })}
+        </div>
+        <div class="label-row">
+          ${fieldStatusBadge("Address lookup, future")}
+          ${fieldStatusBadge("Land Registry, future")}
+          ${fieldStatusBadge("Valuation/property data, future")}
+        </div>
         <div class="form-grid three">
           <div class="field"><label>Security address</label><input name="security_address" value="${valueAttr(security.security_address || caseRecord.security_address_headline)}" /></div>
           <div class="field"><label>Owner</label><input name="owner" value="${valueAttr(security.owner)}" /></div>
           <div class="field"><label>Tenure</label><select name="tenure">${optionList(["Freehold", "Leasehold", "TBC"], security.tenure || "TBC")}</select></div>
-          <div class="field"><label>Security type</label><select name="security_type">${optionList(["Residential", "Semi-commercial", "Commercial", "Land", "Part-developed development", "Mixed-use", "Development site", "Owner-occupied property", "Investment property", "Other"], security.security_type || "Mixed-use")}</select></div>
           <div class="field"><label>Current value</label><input name="current_value" value="${valueAttr(security.current_value || "")}" inputmode="decimal" /></div>
           <div class="field"><label>Purchase price</label><input name="purchase_price" value="${valueAttr(security.purchase_price || "")}" inputmode="decimal" /></div>
           <div class="field"><label>GDV</label><input name="gdv" value="${valueAttr(security.gdv || "")}" inputmode="decimal" /></div>
-          <div class="field"><label>Proposed charge type</label><select name="proposed_charge_type">${optionList(["First charge", "Second charge", "Equitable charge", "Debenture", "Personal guarantee"], security.proposed_charge_type || "First charge")}</select></div>
           <div class="field"><label>Existing lender</label><input name="existing_lender" value="${valueAttr(security.existing_lender || "")}" /></div>
           <div class="field"><label>Existing balance</label><input name="existing_balance" value="${valueAttr(security.existing_balance || "")}" inputmode="decimal" /></div>
           <div class="field"><label>Valuation status</label><select name="valuation_status">${optionList(["Required", "Ordered", "Received", "Not required"], security.valuation_status || "Required")}</select></div>
@@ -1702,6 +1776,13 @@ function renderSecurity(caseRecord) {
 function renderCompliance(caseRecord) {
   const security = caseSecurities(caseRecord.id)[0];
   const assessment = state.regulatedAssessments.find((item) => item.case_id === caseRecord.id) || {};
+  const complianceOccupierOptions = [
+    { label: "Yes", value: "Yes" },
+    { label: "No", value: "No" },
+    { label: "Previously lived there", value: "Previously lived there" },
+    { label: "Will live there", value: "Will live there" },
+    { label: "Not sure", value: "Unknown / TBC" }
+  ];
   return `
     <section class="band">
       <div class="band-header">
@@ -1711,11 +1792,11 @@ function renderCompliance(caseRecord) {
         <div class="alert ${caseRecord.regulated_status === "Likely regulated" ? "red" : "amber"}">
           Current classification: <strong>${escapeHtml(caseRecord.regulated_status)}</strong>. Regulated cases must be blocked unless brokerage, broker and lender permissions all support regulated business.
         </div>
+        <div class="guided-section" style="margin-top:16px;">
+          <div class="guided-heading"><h3>Does anyone connected to the borrower live in or intend to live in the property?</h3>${fieldStatusBadge("Human review")}</div>
+          ${renderOptionCards("occupier_connection", complianceOccupierOptions, assessment.occupier_connection || "Unknown / TBC", { compact: true })}
+        </div>
         <div class="form-grid two" style="margin-top:16px;">
-          <div class="field">
-            <label>Does any connected person live in the property?</label>
-            <select name="occupier_connection">${optionList(["Yes", "No", "Not currently, but has lived there", "Will live there", "Unknown / TBC"], assessment.occupier_connection || "Unknown / TBC")}</select>
-          </div>
           <div class="field"><label>Who owns the security?</label><input name="security_owner" value="${valueAttr(assessment.security_owner || security?.owner || "")}" /></div>
           <div class="field"><label>Who is borrowing?</label><input name="borrower" value="${valueAttr(assessment.borrower || "")}" /></div>
           <div class="field"><label>Business purpose?</label><select name="business_purpose">${optionList([{ value: "true", label: "Yes" }, { value: "false", label: "No / TBC" }], String(assessment.business_purpose ?? true))}</select></div>
@@ -1809,24 +1890,43 @@ function renderDevelopment(caseRecord) {
 function renderDocuments(caseRecord) {
   const docs = state.documents.filter((doc) => doc.case_id === caseRecord.id);
   const checks = state.documentChecklistItems.filter((item) => item.case_id === caseRecord.id);
+  const statusGroups = [
+    ["Required", checks.filter((item) => /required|not requested|pending/i.test(item.status || ""))],
+    ["Requested", checks.filter((item) => /requested/i.test(item.status || ""))],
+    ["Missing", checks.filter((item) => /missing|outstanding/i.test(item.status || ""))],
+    ["Uploaded", checks.filter((item) => /received|uploaded/i.test(item.status || ""))],
+    ["Approved", checks.filter((item) => /approved/i.test(item.status || ""))],
+    ["Not required", checks.filter((item) => /not required/i.test(item.status || ""))]
+  ];
   return `
     <div class="split">
       <section class="band">
         <div class="band-header"><div><h3>Document checklist</h3><p>MVP tracks document status and metadata. File services are placeholders.</p></div></div>
         <div class="band-body">
-          ${checks.map((item) => `
-            <div class="document-row" style="margin-bottom:10px;">
-              <div class="actions" style="justify-content:space-between;">
-                <strong>${escapeHtml(item.document_type)}</strong>
-                ${statusPill(item.status)}
-              </div>
-              <div class="actions" style="margin-top:10px;">
-                <button class="button" type="button" data-action="mark-doc" data-check-id="${valueAttr(item.id)}" data-status="Requested">Request</button>
-                <button class="button" type="button" data-action="mark-doc" data-check-id="${valueAttr(item.id)}" data-status="Received">Mark received</button>
-                <button class="button" type="button" data-action="mark-doc" data-check-id="${valueAttr(item.id)}" data-status="Broker approved">Approve</button>
-              </div>
-            </div>
-          `).join("") || `<div class="empty-state">No checklist rows yet.</div>`}
+          <div class="document-status-grid">
+            ${statusGroups.map(([label, rows]) => `
+              <article class="document-status-lane">
+                <div class="guided-heading"><h3>${escapeHtml(label)}</h3>${fieldStatusBadge(String(rows.length))}</div>
+                ${rows.map((item) => `
+                  <div class="document-row">
+                    <div class="actions" style="justify-content:space-between;">
+                      <strong>${escapeHtml(item.document_type)}</strong>
+                      ${statusPill(item.status)}
+                    </div>
+                    <dl class="kv">
+                      <dt>Source</dt><dd>${escapeHtml(item.source || "Checklist")}</dd>
+                      <dt>Updated</dt><dd>${escapeHtml(dateOnly(item.updated_date || item.created_date || todayIso()))}</dd>
+                    </dl>
+                    <div class="actions" style="margin-top:10px;">
+                      <button class="button compact" type="button" data-action="mark-doc" data-check-id="${valueAttr(item.id)}" data-status="Requested">Ask client</button>
+                      <button class="button compact" type="button" data-action="mark-doc" data-check-id="${valueAttr(item.id)}" data-status="Received">Upload</button>
+                      <button class="button compact" type="button" data-action="mark-doc" data-check-id="${valueAttr(item.id)}" data-status="Broker approved">Approve</button>
+                    </div>
+                  </div>
+                `).join("") || `<div class="empty-state">None</div>`}
+              </article>
+            `).join("")}
+          </div>
         </div>
       </section>
       <aside class="band">
@@ -1839,13 +1939,20 @@ function renderDocuments(caseRecord) {
         </form>
       </aside>
     </div>
-    <section class="band">
-      <div class="band-header"><div><h3>Documents</h3><p>Visible to broker and selected lenders according to submission level.</p></div></div>
-      <div class="band-body table-wrap">
-        <table>
-          <thead><tr><th>Type</th><th>File</th><th>Status</th><th>Visibility</th><th>AI extraction</th></tr></thead>
-          <tbody>${docs.map((doc) => `<tr><td>${escapeHtml(doc.document_type)}</td><td>${escapeHtml(doc.file)}</td><td>${statusPill(doc.status)}</td><td>${escapeHtml(doc.visibility)}</td><td>${escapeHtml(doc.ai_extraction_status)}</td></tr>`).join("")}</tbody>
-        </table>
+    <section class="surface-panel">
+      <div class="section-heading"><div><h3>Uploaded documents</h3><p>Visible to broker and selected lenders according to submission level.</p></div></div>
+      <div class="document-card-grid">
+        ${docs.map((doc) => `
+          <article class="document-card">
+            <div class="actions" style="justify-content:space-between;">
+              <strong>${escapeHtml(doc.document_type)}</strong>
+              ${statusPill(doc.status)}
+            </div>
+            <p>${escapeHtml(doc.file)}</p>
+            <div class="label-row">${fieldStatusBadge(doc.visibility || "Visibility TBC")} ${fieldStatusBadge(doc.ai_extraction_status || "AI not run")}</div>
+            <small class="subtle">Source: ${escapeHtml(doc.source || "Manual upload")} · Updated ${escapeHtml(dateOnly(doc.uploaded_date || todayIso()))}</small>
+          </article>
+        `).join("") || `<div class="empty-state">No uploaded documents yet.</div>`}
       </div>
     </section>
   `;
@@ -1977,30 +2084,42 @@ function renderLenderSearch(caseRecord) {
 
 function renderLenderSubmissions(caseRecord) {
   const submissions = caseSubmissions(caseRecord.id);
+  const lanes = [
+    ["Draft", submissions.filter((item) => item.status === "Draft")],
+    ["Sent", submissions.filter((item) => ["Sent", "Viewed"].includes(item.status))],
+    ["More information requested", submissions.filter((item) => /more information/i.test(item.status) || /request/i.test(item.decision || ""))],
+    ["Decision pending", submissions.filter((item) => /decision pending|referred|credit/i.test(item.status || ""))],
+    ["Terms received", submissions.filter((item) => /terms/i.test(item.status || ""))],
+    ["Declined", submissions.filter((item) => /declined/i.test(item.status || ""))]
+  ];
   return `
-    <section class="band">
-      <div class="band-header">
+    <section class="surface-panel">
+      <div class="section-heading">
         <div><h3>Lender submissions</h3><p>Email-only lenders receive a branded placeholder email with a secure credit dashboard link and response token.</p></div>
       </div>
-      <div class="band-body table-wrap">
-        <table>
-          <thead><tr><th>Lender</th><th>Level</th><th>Status</th><th>Decision</th><th>Response link</th><th>Action</th></tr></thead>
-          <tbody>
-            ${submissions.map((submission) => {
+      <div class="submission-pipeline">
+        ${lanes.map(([label, rows]) => `
+          <article class="pipeline-lane">
+            <div class="guided-heading"><h3>${escapeHtml(label)}</h3>${fieldStatusBadge(String(rows.length))}</div>
+            ${rows.map((submission) => {
               const lender = state.lenderProfiles.find((item) => item.id === submission.lender_id);
               return `
-                <tr>
-                  <td><strong>${escapeHtml(lender?.lender_name || "Unknown lender")}</strong><br><span class="subtle">${escapeHtml(lender?.platform_status || "")}</span></td>
-                  <td>${escapeHtml(submission.submission_level)}</td>
-                  <td>${statusPill(submission.status)}</td>
-                  <td>${escapeHtml(submission.decision || "Awaited")}</td>
-                  <td><a href="/lender-response/${submission.response_token}" data-link>${escapeHtml(submission.response_token)}</a></td>
-                  <td><button class="button primary" type="button" data-action="send-submission" data-submission-id="${valueAttr(submission.id)}">Send enquiry</button></td>
-                </tr>
+                <div class="submission-card">
+                  <div class="actions" style="justify-content:space-between;">
+                    <strong>${escapeHtml(lender?.lender_name || "Unknown lender")}</strong>
+                    ${statusPill(submission.status)}
+                  </div>
+                  <p>${escapeHtml(submission.submission_level)} · ${escapeHtml(submission.decision || "Awaited")}</p>
+                  <a class="text-link" href="/lender-response/${submission.response_token}" data-link>${escapeHtml(submission.response_token)}</a>
+                  <div class="actions" style="margin-top:10px;">
+                    <button class="button primary compact" type="button" data-action="send-submission" data-submission-id="${valueAttr(submission.id)}">Send enquiry</button>
+                    <a class="button compact" href="/cases/${caseRecord.id}/credit-paper" data-link>Credit paper</a>
+                  </div>
+                </div>
               `;
-            }).join("") || `<tr><td colspan="6">No submissions yet. Add lenders from lender search.</td></tr>`}
-          </tbody>
-        </table>
+            }).join("") || `<div class="empty-state">No items</div>`}
+          </article>
+        `).join("")}
       </div>
     </section>
   `;
@@ -2370,11 +2489,16 @@ function renderLenderProfilePage() {
       <div class="band-header"><div><h3>${escapeHtml(lender?.lender_name || "Lender profile")}</h3><p>Lender profile, appetite, response history, decline reasons and white-label settings.</p></div><a class="button primary" href="/lender/dashboard" data-link>Open lender workflow</a></div>
       <div class="band-body grid two">
         <div class="profile-panel">
+          <div class="profile-tabs">
+            ${["Overview", "Appetite", "Product Sheets", "Activity", "White Label", "Users"].map((item, index) => `<span class="${index === 0 ? "active" : ""}">${escapeHtml(item)}</span>`).join("")}
+          </div>
           <dl class="kv">
             <dt>Type</dt><dd>${escapeHtml(lender?.lender_type || "TBC")}</dd>
             <dt>Website</dt><dd>${escapeHtml(lender?.website || "TBC")}</dd>
             <dt>Submission email</dt><dd>${escapeHtml(lender?.submission_email || "TBC")}</dd>
             <dt>Relationship manager</dt><dd>${escapeHtml(lender?.relationship_manager || "TBC")}</dd>
+            <dt>Product sheets</dt><dd>Placeholder upload area under Market Intelligence</dd>
+            <dt>Decline reasons</dt><dd>${state.lenderStructuredResponses.filter((item) => item.lender_id === lender?.id && item.decline_reason).length || 0} captured</dd>
           </dl>
         </div>
         <div class="profile-panel">
@@ -2442,15 +2566,26 @@ function renderMarketIntelligenceAdmin() {
         </div>
       </div>
     </section>
-    <section class="band">
-      <div class="band-header"><div><h3>Review queue placeholder</h3><p>Admin-controlled queue for extracted lender criteria.</p></div></div>
-      <div class="band-body table-wrap">
-        <table>
-          <thead><tr><th>Source</th><th>Lender</th><th>Product</th><th>Status</th><th>Confidence</th><th>Controls</th></tr></thead>
-          <tbody>
-            ${reviewRows.map((row) => `<tr><td>${escapeHtml(row.source)}</td><td>${escapeHtml(row.lender)}</td><td>${escapeHtml(row.product)}</td><td>${statusPill(row.status)}</td><td>${escapeHtml(row.confidence)}</td><td><div class="actions"><button class="button" disabled>Approve</button><button class="button" disabled>Edit</button><button class="button" disabled>Reject</button><button class="button" disabled>Merge</button></div></td></tr>`).join("")}
-          </tbody>
-        </table>
+    <section class="surface-panel">
+      <div class="section-heading"><div><h3>Review queue placeholder</h3><p>Admin-controlled queue for extracted lender criteria.</p></div></div>
+      <div class="market-review-grid">
+        ${reviewRows.map((row) => `
+          <article class="market-review-card">
+            <div class="actions" style="justify-content:space-between;">
+              <strong>${escapeHtml(row.lender)}</strong>
+              ${statusPill(row.status)}
+            </div>
+            <p>${escapeHtml(row.product)} · ${escapeHtml(row.source)}</p>
+            <div class="label-row">${fieldStatusBadge(`Confidence ${row.confidence}`)} ${fieldStatusBadge("No automatic update")}</div>
+            <div class="actions">
+              <button class="button compact" disabled>Approve</button>
+              <button class="button compact" disabled>Edit</button>
+              <button class="button compact" disabled>Reject</button>
+              <button class="button compact" disabled>Merge</button>
+              <button class="button compact" disabled>Ask lender</button>
+            </div>
+          </article>
+        `).join("")}
       </div>
     </section>
   `;
@@ -2513,6 +2648,8 @@ function renderLenderDashboard() {
       <div class="metric"><span>Applications</span><strong>${submissions.length}</strong><small>Assigned in LendTech</small></div>
       <div class="metric"><span>Responses needed</span><strong>${submissions.filter((item) => ["Sent", "Viewed", "Draft"].includes(item.status)).length}</strong><small>Credit team queue</small></div>
       <div class="metric"><span>Terms issued</span><strong>${submissions.filter((item) => item.status === "Indicative terms received").length}</strong><small>Structured responses</small></div>
+      <div class="metric"><span>Declines</span><strong>${submissions.filter((item) => /declined/i.test(item.status || "")).length}</strong><small>With reason capture</small></div>
+      <div class="metric"><span>Avg response</span><strong>2.4d</strong><small>Placeholder metric</small></div>
     </div>
     <section class="surface-panel">
       <div class="section-heading"><div><h3>Credit queue</h3><p>Applications open into a lender-ready credit paper.</p></div></div>
@@ -2540,19 +2677,31 @@ function renderLenderDashboard() {
 function renderLenderApplications() {
   const user = currentUser();
   const lenderId = user?.lender_id || "lender-uklg";
+  const applications = state.cases.filter((caseRecord) => caseRecord.source_lender_id === lenderId || state.caseLenderSubmissions.some((submission) => submission.case_id === caseRecord.id && submission.lender_id === lenderId));
   return `
-    <section class="band">
-      <div class="band-header"><div><h3>White-label applications</h3><p>The UK Lender Group applications created through /apply/uk-lender-group.</p></div><a class="button primary" href="/apply/uk-lender-group" data-link>Open application link</a></div>
-      <div class="band-body table-wrap">
-        <table>
-          <thead><tr><th>Case</th><th>Source</th><th>Applicant</th><th>Product</th><th>Loan</th><th>Status</th></tr></thead>
-          <tbody>
-            ${state.cases.filter((caseRecord) => caseRecord.source_lender_id === lenderId || state.caseLenderSubmissions.some((submission) => submission.case_id === caseRecord.id && submission.lender_id === lenderId)).map((caseRecord) => {
-              const party = state.applicationParties.find((item) => item.id === caseRecord.client_id);
-              return `<tr><td><a href="/cases/${caseRecord.id}/credit-paper" data-link>${escapeHtml(caseRecord.case_reference)}</a></td><td>${escapeHtml(caseRecord.source_application_link)}</td><td>${escapeHtml(party?.name || "TBC")}</td><td>${escapeHtml(caseRecord.case_type)}</td><td>${formatMoney(caseRecord.loan_amount_requested)}</td><td>${statusPill(caseRecord.status)}</td></tr>`;
-            }).join("") || `<tr><td colspan="6">No direct white-label applications yet.</td></tr>`}
-          </tbody>
-        </table>
+    <section class="surface-panel">
+      <div class="section-heading"><div><h3>White-label applications</h3><p>The UK Lender Group applications created through /apply/uk-lender-group.</p></div><a class="button primary" href="/apply/uk-lender-group" data-link>Open application link</a></div>
+      <div class="application-card-grid">
+        ${applications.map((caseRecord) => {
+          const party = state.applicationParties.find((item) => item.id === caseRecord.client_id);
+          return `
+            <article class="application-card">
+              <div class="actions" style="justify-content:space-between;">
+                <a href="/cases/${caseRecord.id}/credit-paper" data-link><strong>${escapeHtml(caseRecord.case_reference)}</strong></a>
+                ${statusPill(caseRecord.status)}
+              </div>
+              <p>${escapeHtml(party?.name || "TBC")} · ${escapeHtml(caseRecord.case_type)}</p>
+              <dl class="kv">
+                <dt>Loan</dt><dd>${formatMoney(caseRecord.loan_amount_requested)}</dd>
+                <dt>Source</dt><dd>${escapeHtml(caseRecord.source_application_link || "Broker submission")}</dd>
+                <dt>Security</dt><dd>${escapeHtml(caseRecord.security_address_headline || "TBC")}</dd>
+              </dl>
+              <div class="actions">
+                <a class="button primary compact" href="/cases/${caseRecord.id}/credit-paper" data-link>Review credit paper</a>
+              </div>
+            </article>
+          `;
+        }).join("") || `<div class="empty-state">No direct white-label applications yet.</div>`}
       </div>
     </section>
   `;
@@ -2735,7 +2884,11 @@ function renderLenderAppetitePage() {
   return `
     <section class="band">
       <div class="band-header"><div><h3>${escapeHtml(lender?.lender_name || "Lender")} appetite</h3><p>Approved or placeholder appetite records with freshness labels.</p></div></div>
-      <div class="band-body grid two">
+      <div class="band-body">
+        <div class="label-row">
+          ${["Fresh", "Current", "Stale", "Outdated", "Unverified", "Lender confirmed", "Admin confirmed", "AI extracted only"].map((label) => `<span class="status ${["Fresh", "Current", "Lender confirmed", "Admin confirmed"].includes(label) ? "green" : ["Stale", "Unverified", "AI extracted only"].includes(label) ? "amber" : "red"}">${escapeHtml(label)}</span>`).join("")}
+        </div>
+        <div class="grid two">
         ${appetites.map((appetite) => `
           <article class="profile-panel">
             <div class="actions" style="justify-content:space-between;"><h3>${escapeHtml(appetite.product_type)}</h3>${freshnessPill(appetite)}</div>
@@ -2747,6 +2900,7 @@ function renderLenderAppetitePage() {
             </dl>
           </article>
         `).join("") || `<div class="empty-state">No appetite records yet.</div>`}
+        </div>
       </div>
     </section>
   `;
@@ -2970,9 +3124,17 @@ function renderWhiteLabelApplication(slug) {
           </div>
           <div class="step-panel">
             <div class="guided-heading"><h3>5. Upload or paste</h3>${fieldStatusBadge("Documents optional")}</div>
-            <div class="dropzone">
-              <strong>Upload documents</strong>
-              <span>Placeholder for ID, title, appraisal, cost plan, valuation, portfolio or term sheet uploads.</span>
+            <div class="ai-drop-zone white-label-dropbox">
+              <div class="ai-drop-heading">
+                <div>
+                  <span class="eyebrow">BankManager.ai Drop Box</span>
+                  <strong>Upload, take a photo or paste what you have.</strong>
+                  <span>BankManager.ai will structure the application for ${escapeHtml(lender.lender_name)} and show missing information later.</span>
+                </div>
+              </div>
+              <div class="dropbox-input-types">
+                ${["Files", "Photos", "PDFs", "Term sheets", "Appraisals", "Portfolios", "Planning", "Notes"].map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+              </div>
               <div class="upload-choice-row">
                 <button class="button" type="button">Upload files</button>
                 <button class="button" type="button">Take photo</button>
@@ -3213,6 +3375,7 @@ function handleNewCase(data) {
   const productName = product?.product_name || data.custom_product || data.product_id || "Other";
   const borrowerName = data.client_name || "Borrower TBC";
   const securityAddress = data.security_address || "Security TBC";
+  const draftUploads = aiUploadsForCase("new-case-draft");
   const caseId = createId("case");
   const partyId = createId("party");
   const securityId = createId("security");
@@ -3278,6 +3441,30 @@ function handleNewCase(data) {
     valuation_status: "Required",
     notes: ""
   });
+  if ((data.summary || "").trim() || draftUploads.length) {
+    const sourceId = createId("source");
+    state.brainDumpSourceRecords.unshift({
+      id: sourceId,
+      case_id: caseId,
+      client_id: partyId,
+      broker_id: data.broker_id,
+      brokerage_id: data.brokerage_id,
+      input_type: draftUploads.length ? "New case Drop Box and pasted notes" : "New case pasted notes",
+      original_content: data.summary || `Files uploaded for new case: ${draftUploads.map((file) => file.name).join(", ")}`,
+      attachments: draftUploads,
+      source_file_email_reference: "BankManager.ai Drop Box",
+      ai_analysis_status: "Broker review required",
+      extracted_fields: ["summary", "product", "borrower", "security"],
+      broker_approved_fields: [],
+      rejected_fields: [],
+      tasks_created: [],
+      emails_drafted: [],
+      emails_sent: [],
+      created_date: todayIso()
+    });
+    addAudit(caseId, "Source record created", "BrainDumpSourceRecord", sourceId, "New-case Drop Box content was linked to the draft case.");
+    setAiUploadsForCase("new-case-draft", []);
+  }
   addAudit(caseId, "Case creation", "Case", caseId, `Case ${caseReference} created from broker dashboard.`);
   notify("Case created");
   saveState();
