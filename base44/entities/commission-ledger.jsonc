@@ -1,0 +1,24 @@
+{
+  "name": "CommissionLedger",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "expected_broker_fee": { "type": "number", "description": "Expected broker fee" },
+    "expected_lender_procuration_fee": { "type": "number", "description": "Expected lender procuration fee" },
+    "enhanced_procuration_fee": { "type": "number", "description": "Enhanced procuration fee" },
+    "platform_override": { "type": "number", "description": "Platform override" },
+    "uka_lendtech_share": { "type": "number", "description": "UKA or LendTech share" },
+    "broker_share": { "type": "number", "description": "Broker share" },
+    "introducer_share": { "type": "number", "description": "Introducer share" },
+    "regulated_referral_share": { "type": "number", "description": "Regulated referral share" },
+    "private_lender_fee": { "type": "number", "description": "Private lender fee" },
+    "vat": { "type": "number", "description": "VAT" },
+    "invoice_status": { "type": "string", "description": "Invoice status" },
+    "payment_status": { "type": "string", "description": "Payment status" },
+    "due_date": { "type": "string", "format": "date", "description": "Due date" },
+    "paid_date": { "type": "string", "format": "date", "description": "Paid date" },
+    "dispute_status": { "type": "string", "description": "Dispute status" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "invoice_status", "payment_status"]
+}

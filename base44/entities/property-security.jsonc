@@ -1,0 +1,29 @@
+{
+  "name": "PropertySecurity",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "security_address": { "type": "string", "description": "Security address" },
+    "title_number": { "type": "string", "description": "Title number" },
+    "owner": { "type": "string", "description": "Security owner" },
+    "tenure": { "type": "string", "description": "Tenure" },
+    "security_type": { "type": "string", "enum": ["Residential", "Semi-commercial", "Commercial", "Land", "Part-developed development", "Mixed-use", "Development site", "Owner-occupied property", "Investment property", "Other"], "description": "Security type" },
+    "current_use": { "type": "string", "description": "Current use" },
+    "proposed_use": { "type": "string", "description": "Proposed use" },
+    "current_value": { "type": "number", "description": "Current value" },
+    "purchase_price": { "type": "number", "description": "Purchase price" },
+    "value_90_day": { "type": "number", "description": "90-day value" },
+    "value_180_day": { "type": "number", "description": "180-day value" },
+    "gdv": { "type": "number", "description": "Gross development value" },
+    "existing_first_charge": { "type": "boolean", "default": false, "description": "Existing first charge flag" },
+    "existing_second_charge": { "type": "boolean", "default": false, "description": "Existing second charge flag" },
+    "proposed_charge_type": { "type": "string", "description": "Proposed charge type" },
+    "existing_lender": { "type": "string", "description": "Existing lender" },
+    "existing_balance": { "type": "number", "description": "Existing balance" },
+    "consent_required": { "type": "boolean", "default": false, "description": "Consent required" },
+    "consent_obtained": { "type": "boolean", "default": false, "description": "Consent obtained" },
+    "valuation_status": { "type": "string", "description": "Valuation status" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "security_address", "security_type"]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "DevelopmentTeamMember",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "role": {
+      "type": "string",
+      "enum": ["Developer", "Project manager", "Main contractor", "Architect", "QS / cost consultant", "Planning consultant", "Structural engineer", "Monitoring surveyor", "Solicitor", "Accountant", "Other"],
+      "description": "Professional team role"
+    },
+    "name": { "type": "string", "description": "Person name" },
+    "firm": { "type": "string", "description": "Firm name" },
+    "email": { "type": "string", "format": "email", "description": "Email" },
+    "phone": { "type": "string", "description": "Phone" },
+    "status": { "type": "string", "description": "Appointment or confirmation status" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "role", "status"]
+}

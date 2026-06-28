@@ -1,0 +1,19 @@
+{
+  "name": "UserProfile",
+  "type": "object",
+  "properties": {
+    "full_name": { "type": "string", "description": "User full name" },
+    "email": { "type": "string", "format": "email", "description": "Login and contact email" },
+    "role": {
+      "type": "string",
+      "enum": ["Super Admin", "Admin", "Brokerage Admin", "Broker", "Regulated Broker", "Client / Borrower", "Lender", "Email-only Lender", "Professional Party", "Introducer", "Packaging Support User", "UK Lender Group User", "Private Capital / Investor User"],
+      "description": "Role-based access control role"
+    },
+    "organisation_id": { "type": "string", "description": "Linked organisation record" },
+    "brokerage_id": { "type": "string", "description": "Linked brokerage profile where relevant" },
+    "broker_id": { "type": "string", "description": "Linked broker profile where relevant" },
+    "lender_id": { "type": "string", "description": "Linked lender profile where relevant" },
+    "status": { "type": "string", "enum": ["active", "invited", "suspended", "archived"], "default": "active", "description": "User status" }
+  },
+  "required": ["full_name", "email", "role", "status"]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID where relevant" },
+    "user_id": { "type": "string", "description": "Acting user ID" },
+    "action": { "type": "string", "description": "Audit action" },
+    "entity_type": { "type": "string", "description": "Entity type affected" },
+    "entity_id": { "type": "string", "description": "Entity ID affected" },
+    "detail": { "type": "string", "description": "Audit detail" },
+    "source_record_id": { "type": "string", "description": "Linked source record ID where relevant" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created date" }
+  },
+  "required": ["user_id", "action", "entity_type", "detail", "created_date"]
+}

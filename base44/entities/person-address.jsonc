@@ -1,0 +1,17 @@
+{
+  "name": "PersonAddress",
+  "type": "object",
+  "properties": {
+    "person_id": { "type": "string", "description": "Linked person ID" },
+    "address_line_1": { "type": "string", "description": "Address line 1" },
+    "address_line_2": { "type": "string", "description": "Address line 2" },
+    "town_city": { "type": "string", "description": "Town or city" },
+    "county": { "type": "string", "description": "County" },
+    "postcode": { "type": "string", "description": "Postcode" },
+    "country": { "type": "string", "description": "Country" },
+    "date_moved_in": { "type": "string", "format": "date", "description": "Date moved in" },
+    "date_moved_out": { "type": "string", "format": "date", "description": "Date moved out" },
+    "residential_status": { "type": "string", "description": "Residential status" }
+  },
+  "required": ["person_id", "address_line_1", "postcode", "date_moved_in"]
+}

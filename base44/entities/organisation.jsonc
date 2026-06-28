@@ -1,0 +1,23 @@
+{
+  "name": "Organisation",
+  "type": "object",
+  "properties": {
+    "organisation_name": { "type": "string", "description": "Legal organisation name" },
+    "trading_name": { "type": "string", "description": "Trading name" },
+    "organisation_type": {
+      "type": "string",
+      "enum": ["Brokerage", "Lender", "Client / Borrower", "Professional Firm", "Introducer", "Platform Admin", "UK Lender Group", "Private Capital / Family Office", "Investor"],
+      "description": "Organisation category"
+    },
+    "company_number": { "type": "string", "description": "Companies House number where applicable" },
+    "website": { "type": "string", "format": "uri", "description": "Website URL" },
+    "main_contact": { "type": "string", "description": "Main contact name" },
+    "email": { "type": "string", "format": "email", "description": "Primary email" },
+    "phone": { "type": "string", "description": "Primary phone" },
+    "logo": { "type": "string", "description": "Logo reference or initials" },
+    "brand_colours": { "type": "string", "description": "Comma-separated brand colour values" },
+    "status": { "type": "string", "enum": ["pending", "active", "suspended", "archived"], "default": "pending", "description": "Organisation status" },
+    "notes": { "type": "string", "description": "Internal notes" }
+  },
+  "required": ["organisation_name", "organisation_type", "status"]
+}

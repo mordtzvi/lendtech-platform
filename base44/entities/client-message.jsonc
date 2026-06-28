@@ -1,0 +1,13 @@
+{
+  "name": "ClientMessage",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "direction": { "type": "string", "enum": ["Inbound", "Outbound"], "description": "Message direction" },
+    "subject": { "type": "string", "description": "Message subject" },
+    "body": { "type": "string", "description": "Message body" },
+    "status": { "type": "string", "description": "Message status" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created date" }
+  },
+  "required": ["case_id", "direction", "body", "status"]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "DocumentChecklistItem",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "document_type": { "type": "string", "description": "Document type requested" },
+    "status": { "type": "string", "enum": ["Required", "Requested", "Received", "Broker approved", "Not required", "To order"], "default": "Required", "description": "Checklist status" },
+    "requested_from": { "type": "string", "description": "Who document is requested from" },
+    "due_date": { "type": "string", "format": "date", "description": "Due date" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "document_type", "status"]
+}

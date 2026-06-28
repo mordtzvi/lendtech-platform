@@ -1,0 +1,27 @@
+{
+  "name": "BridgingLoan",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "loan_purpose": { "type": "string", "description": "Loan purpose" },
+    "loan_amount": { "type": "number", "description": "Loan amount" },
+    "net_loan": { "type": "number", "description": "Net loan" },
+    "gross_loan": { "type": "number", "description": "Gross loan" },
+    "property_value": { "type": "number", "description": "Property value" },
+    "ltv": { "type": "number", "description": "LTV percentage" },
+    "term": { "type": "integer", "description": "Term in months" },
+    "interest_rate": { "type": "number", "description": "Interest rate" },
+    "interest_type": { "type": "string", "enum": ["Retained", "Rolled", "Serviced"], "description": "Interest type" },
+    "arrangement_fee": { "type": "number", "description": "Arrangement fee percentage" },
+    "exit_fee": { "type": "number", "description": "Exit fee percentage" },
+    "broker_fee": { "type": "number", "description": "Broker fee" },
+    "completion_deadline": { "type": "string", "format": "date", "description": "Completion deadline" },
+    "exit_strategy": { "type": "string", "description": "Exit strategy" },
+    "regulated_status": { "type": "string", "description": "Regulated status" },
+    "charge_type": { "type": "string", "description": "Charge type" },
+    "refurbishment_required": { "type": "boolean", "default": false, "description": "Refurbishment required" },
+    "planning_angle": { "type": "string", "description": "Planning angle" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "loan_amount", "term"]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "ConsentRecord",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "party_id": { "type": "string", "description": "Linked party ID" },
+    "consent_type": { "type": "string", "enum": ["Processing data", "Sharing with lenders", "Sharing with professionals", "AI analysis", "Client portal invite", "Email communication", "Regulated brokerage referral", "Document storage", "White-label lender application submission"], "description": "Consent type" },
+    "granted": { "type": "boolean", "default": false, "description": "Consent granted" },
+    "granted_by": { "type": "string", "description": "Who granted consent" },
+    "granted_date": { "type": "string", "format": "date", "description": "Granted date" },
+    "expiry_date": { "type": "string", "format": "date", "description": "Expiry date" },
+    "source": { "type": "string", "description": "Source of consent" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "consent_type", "granted", "source"]
+}

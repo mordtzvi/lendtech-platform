@@ -1,0 +1,15 @@
+{
+  "name": "CreditPaperVersion",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "submission_id": { "type": "string", "description": "Linked lender submission ID" },
+    "version": { "type": "integer", "description": "Version number" },
+    "generated_by": { "type": "string", "description": "User that generated version" },
+    "generated_date": { "type": "string", "format": "date-time", "description": "Generated date" },
+    "format": { "type": "string", "enum": ["Dashboard", "PDF", "Word", "Lender pack"], "description": "Output format" },
+    "status": { "type": "string", "description": "Version status" },
+    "audit_log_id": { "type": "string", "description": "Linked audit log ID" }
+  },
+  "required": ["case_id", "version", "format", "generated_date"]
+}

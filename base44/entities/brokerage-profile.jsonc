@@ -1,0 +1,26 @@
+{
+  "name": "BrokerageProfile",
+  "type": "object",
+  "properties": {
+    "brokerage_name": { "type": "string", "description": "Brokerage name" },
+    "trading_name": { "type": "string", "description": "Trading name" },
+    "logo": { "type": "string", "description": "Logo reference" },
+    "brand_colours": { "type": "string", "description": "Brand colour values" },
+    "website": { "type": "string", "format": "uri", "description": "Website" },
+    "company_number": { "type": "string", "description": "Company number" },
+    "main_contact_email": { "type": "string", "format": "email", "description": "Main contact email" },
+    "phone_number": { "type": "string", "description": "Phone number" },
+    "fca_status": { "type": "string", "description": "FCA status" },
+    "fca_reference_number": { "type": "string", "description": "FCA reference number" },
+    "appointed_representative_status": { "type": "string", "description": "Appointed representative status" },
+    "principal_firm": { "type": "string", "description": "Principal firm" },
+    "can_submit_regulated_deals": { "type": "boolean", "default": false, "description": "Permission to submit regulated deals" },
+    "can_submit_unregulated_deals": { "type": "boolean", "default": true, "description": "Permission to submit unregulated deals" },
+    "nacfb_member": { "type": "boolean", "default": false, "description": "NACFB member flag" },
+    "fiba_member": { "type": "boolean", "default": false, "description": "FIBA member flag" },
+    "ico_registration_number": { "type": "string", "description": "ICO registration number" },
+    "submission_footer_text": { "type": "string", "description": "Footer text used in lender submissions" },
+    "status": { "type": "string", "enum": ["pending", "active", "suspended", "archived"], "default": "pending", "description": "Brokerage status" }
+  },
+  "required": ["brokerage_name", "main_contact_email", "status"]
+}

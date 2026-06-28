@@ -1,0 +1,20 @@
+{
+  "name": "RegulatedAssessment",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "security_id": { "type": "string", "description": "Linked security ID" },
+    "occupier_connection": { "type": "string", "enum": ["Yes", "No", "Not currently, but has lived there", "Will live there", "Unknown / TBC"], "description": "Whether connected person lives in or may live in property" },
+    "security_owner": { "type": "string", "description": "Who owns the security" },
+    "borrower": { "type": "string", "description": "Who is borrowing" },
+    "business_purpose": { "type": "boolean", "default": true, "description": "Loan is for business purposes" },
+    "security_owner_different_from_borrower": { "type": "boolean", "default": false, "description": "Security owner differs from borrower" },
+    "third_party_charge": { "type": "boolean", "default": false, "description": "Third-party charge flag" },
+    "independent_legal_advice_required": { "type": "boolean", "default": false, "description": "Independent legal advice required" },
+    "occupier_consent_required": { "type": "boolean", "default": false, "description": "Occupier consent required" },
+    "classification_result": { "type": "string", "enum": ["Likely regulated", "Likely unregulated business purpose", "Third-party charge review required", "Consumer BTL review required", "Manual compliance review required"], "description": "Classification result" },
+    "broker_approved": { "type": "boolean", "default": false, "description": "Broker or compliance approval flag" },
+    "notes": { "type": "string", "description": "Assessment notes" }
+  },
+  "required": ["case_id", "security_id", "occupier_connection", "classification_result"]
+}

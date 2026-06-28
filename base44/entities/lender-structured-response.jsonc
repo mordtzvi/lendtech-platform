@@ -1,0 +1,19 @@
+{
+  "name": "LenderStructuredResponse",
+  "type": "object",
+  "properties": {
+    "submission_id": { "type": "string", "description": "Linked submission ID" },
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "lender_id": { "type": "string", "description": "Linked lender ID" },
+    "response_type": { "type": "string", "enum": ["Acceptable in principle", "Decline", "Request more information", "Decision pending", "Refer to credit", "Issue indicative terms", "Register as lender"], "description": "Response button type" },
+    "decline_reason": { "type": "string", "description": "Decline reason" },
+    "requested_information": { "type": "array", "description": "Requested information checklist" },
+    "decision_pending_reason": { "type": "string", "description": "Decision pending reason" },
+    "timescale": { "type": "string", "description": "Expected timescale" },
+    "indicative_terms": { "type": "string", "description": "Indicative terms" },
+    "uploaded_file": { "type": "string", "format": "file", "description": "Uploaded file" },
+    "notes": { "type": "string", "description": "Notes" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created date" }
+  },
+  "required": ["submission_id", "case_id", "lender_id", "response_type"]
+}

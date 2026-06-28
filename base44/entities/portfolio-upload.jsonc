@@ -1,0 +1,15 @@
+{
+  "name": "PortfolioUpload",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "document_id": { "type": "string", "description": "Linked document ID" },
+    "upload_status": { "type": "string", "description": "Upload status" },
+    "ai_extraction_status": { "type": "string", "description": "AI extraction status" },
+    "broker_review_status": { "type": "string", "description": "Broker review status" },
+    "client_confirmation_status": { "type": "string", "description": "Client confirmation status" },
+    "summary": { "type": "object", "description": "Portfolio summary" },
+    "redacted_available": { "type": "boolean", "default": false, "description": "Redacted version available" }
+  },
+  "required": ["case_id", "upload_status"]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Document",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "uploaded_by": { "type": "string", "description": "User ID that uploaded document" },
+    "document_type": { "type": "string", "description": "Document type" },
+    "file": { "type": "string", "format": "file", "description": "File reference" },
+    "version": { "type": "integer", "description": "Document version" },
+    "status": { "type": "string", "description": "Document status" },
+    "visibility": { "type": "string", "description": "Document visibility" },
+    "source": { "type": "string", "description": "Document source" },
+    "ai_extraction_status": { "type": "string", "description": "AI extraction status" },
+    "uploaded_date": { "type": "string", "format": "date-time", "description": "Uploaded date" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "document_type", "status"]
+}

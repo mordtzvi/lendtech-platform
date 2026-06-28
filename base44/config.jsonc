@@ -1,0 +1,14 @@
+{
+  "name": "LendTech Platform",
+  "description": "A commercial finance operating system with broker case packaging, BankManager.ai, lender matching, lender credit papers, quote comparison, commission tracking and UK Lender Group white-label lender application.",
+  "entitiesDir": "./entities",
+  "functionsDir": "./functions",
+  "agentsDir": "./agents",
+  "connectorsDir": "./connectors",
+  "site": {
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
+    "serveCommand": "npm run dev",
+    "outputDirectory": "./dist"
+  }
+}

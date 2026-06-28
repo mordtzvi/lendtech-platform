@@ -1,0 +1,18 @@
+{
+  "name": "PortfolioProperty",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "portfolio_upload_id": { "type": "string", "description": "Linked portfolio upload ID" },
+    "address": { "type": "string", "description": "Property address" },
+    "property_type": { "type": "string", "description": "Property type" },
+    "current_value": { "type": "number", "description": "Current value" },
+    "debt": { "type": "number", "description": "Current debt" },
+    "equity": { "type": "number", "description": "Current equity" },
+    "ltv": { "type": "number", "description": "LTV percentage" },
+    "rental_income": { "type": "number", "description": "Rental income" },
+    "verified": { "type": "boolean", "default": false, "description": "Verified flag" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "address"]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "SecurityCharge",
+  "type": "object",
+  "properties": {
+    "security_id": { "type": "string", "description": "Linked security ID" },
+    "charge_position": { "type": "string", "description": "Charge position" },
+    "existing_lender": { "type": "string", "description": "Existing lender" },
+    "lender_selection_status": { "type": "string", "enum": ["selected from list", "unknown", "TBC", "manual"], "description": "How lender was selected" },
+    "amount_outstanding": { "type": "number", "description": "Amount outstanding" },
+    "redemption_figure_date": { "type": "string", "format": "date", "description": "Redemption figure date" },
+    "monthly_payment": { "type": "number", "description": "Monthly payment" },
+    "consent_required": { "type": "boolean", "default": false, "description": "Consent required" },
+    "consent_obtained": { "type": "boolean", "default": false, "description": "Consent obtained" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["security_id", "charge_position"]
+}

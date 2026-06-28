@@ -1,0 +1,20 @@
+{
+  "name": "CaseLenderSubmission",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "lender_id": { "type": "string", "description": "Linked lender ID" },
+    "submission_level": { "type": "string", "enum": ["Quick search without client information", "Quick enquiry with client information", "Detailed enquiry", "Full application"], "description": "Submission level" },
+    "disclosure_level": { "type": "string", "description": "Disclosure level" },
+    "status": { "type": "string", "enum": ["Draft", "Sent", "Viewed", "Acceptable in principle", "Declined", "Request more information", "Decision pending", "Referred to credit", "Indicative terms received", "Full application invited", "Withdrawn"], "default": "Draft", "description": "Submission status" },
+    "sent_date": { "type": "string", "format": "date-time", "description": "Sent date" },
+    "viewed_date": { "type": "string", "format": "date-time", "description": "Viewed date" },
+    "decision": { "type": "string", "description": "Lender decision" },
+    "decline_reason": { "type": "string", "description": "Decline reason" },
+    "requested_information": { "type": "array", "description": "Requested information" },
+    "indicative_terms": { "type": "string", "description": "Indicative terms" },
+    "notes": { "type": "string", "description": "Notes" },
+    "response_token": { "type": "string", "description": "Secure lender response token" }
+  },
+  "required": ["case_id", "lender_id", "submission_level", "status"]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "BrainDumpSourceRecord",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "client_id": { "type": "string", "description": "Client or applicant party ID" },
+    "broker_id": { "type": "string", "description": "Broker profile ID" },
+    "brokerage_id": { "type": "string", "description": "Brokerage profile ID" },
+    "input_type": { "type": "string", "description": "Source input type" },
+    "original_content": { "type": "string", "description": "Original pasted note, email or message" },
+    "attachments": { "type": "array", "description": "Attached documents or files" },
+    "source_file_email_reference": { "type": "string", "description": "File or email reference" },
+    "ai_analysis_status": { "type": "string", "description": "AI analysis status" },
+    "extracted_fields": { "type": "array", "description": "AI-extracted field keys" },
+    "broker_approved_fields": { "type": "array", "description": "Broker-approved field keys" },
+    "rejected_fields": { "type": "array", "description": "Rejected field keys" },
+    "tasks_created": { "type": "array", "description": "Tasks created from source" },
+    "emails_drafted": { "type": "array", "description": "Emails drafted from source" },
+    "emails_sent": { "type": "array", "description": "Emails sent from source" },
+    "analysis_summary": { "type": "object", "description": "Placeholder AI analysis summary" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created date" }
+  },
+  "required": ["case_id", "input_type", "original_content", "ai_analysis_status"]
+}

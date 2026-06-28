@@ -1,0 +1,18 @@
+{
+  "name": "ClientTask",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "request_type": {
+      "type": "string",
+      "enum": ["Missing information request", "Document request", "Portfolio confirmation request", "Assets/liabilities request", "Development experience request", "Application review request", "Quote comparison", "Offer explanation"],
+      "description": "Client request type"
+    },
+    "status": { "type": "string", "description": "Task status" },
+    "message_body": { "type": "string", "description": "Request message body" },
+    "email_id": { "type": "string", "description": "Placeholder email ID" },
+    "secure_link_token": { "type": "string", "description": "Secure request link token" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created date" }
+  },
+  "required": ["case_id", "request_type", "status"]
+}

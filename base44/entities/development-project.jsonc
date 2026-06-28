@@ -1,0 +1,27 @@
+{
+  "name": "DevelopmentProject",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "security_id": { "type": "string", "description": "Linked security ID" },
+    "purchase_price": { "type": "number", "description": "Purchase price" },
+    "current_market_value": { "type": "number", "description": "Current market value" },
+    "gdv": { "type": "number", "description": "GDV" },
+    "development_costs": { "type": "number", "description": "Development costs" },
+    "professional_fees": { "type": "number", "description": "Professional fees" },
+    "contingency": { "type": "number", "description": "Contingency" },
+    "day_one_loan": { "type": "number", "description": "Day-one loan" },
+    "build_facility": { "type": "number", "description": "Build facility" },
+    "total_net_loan": { "type": "number", "description": "Total net loan" },
+    "total_gross_loan": { "type": "number", "description": "Total gross loan" },
+    "development_period": { "type": "integer", "description": "Development period in months" },
+    "sale_refinance_period": { "type": "integer", "description": "Sale or refinance period in months" },
+    "total_term": { "type": "integer", "description": "Total term in months" },
+    "planning_status": { "type": "string", "description": "Planning status" },
+    "development_strategy": { "type": "string", "description": "Development strategy" },
+    "exit_strategy": { "type": "string", "description": "Exit strategy" },
+    "borrower_equity": { "type": "number", "description": "Borrower equity" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "gdv", "development_costs", "total_net_loan"]
+}

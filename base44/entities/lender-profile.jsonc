@@ -1,0 +1,32 @@
+{
+  "name": "LenderProfile",
+  "type": "object",
+  "properties": {
+    "lender_name": { "type": "string", "description": "Lender name" },
+    "lender_type": {
+      "type": "string",
+      "enum": ["Mainstream lender", "Specialist lender", "Private lender", "Email-only lender", "UK Lender Group", "Family office / private capital"],
+      "description": "Lender type"
+    },
+    "logo": { "type": "string", "description": "Logo reference" },
+    "website": { "type": "string", "format": "uri", "description": "Website" },
+    "submission_email": { "type": "string", "format": "email", "description": "Submission email" },
+    "relationship_manager": { "type": "string", "description": "Relationship manager" },
+    "broker_support_email": { "type": "string", "format": "email", "description": "Broker support email" },
+    "platform_status": { "type": "string", "enum": ["active", "email-only", "invited", "pending", "suspended"], "default": "pending", "description": "Platform onboarding status" },
+    "accepts_regulated_deals": { "type": "boolean", "default": false, "description": "Accepts regulated business" },
+    "accepts_unregulated_deals": { "type": "boolean", "default": true, "description": "Accepts unregulated business" },
+    "accepts_bridging": { "type": "boolean", "default": false, "description": "Accepts bridging finance" },
+    "accepts_development_finance": { "type": "boolean", "default": false, "description": "Accepts development finance" },
+    "accepts_commercial_term": { "type": "boolean", "default": false, "description": "Accepts commercial term mortgages" },
+    "accepts_business_finance": { "type": "boolean", "default": false, "description": "Accepts business finance" },
+    "accepts_first_charge": { "type": "boolean", "default": true, "description": "Accepts first charge" },
+    "accepts_second_charge": { "type": "boolean", "default": false, "description": "Accepts second charge" },
+    "accepts_equitable_charge": { "type": "boolean", "default": false, "description": "Accepts equitable charge" },
+    "accepts_mezzanine": { "type": "boolean", "default": false, "description": "Accepts mezzanine" },
+    "accepts_third_party_charge": { "type": "boolean", "default": false, "description": "Accepts third-party charge" },
+    "accepts_director_residential_security": { "type": "boolean", "default": false, "description": "Accepts director residential security" },
+    "notes": { "type": "string", "description": "Lender notes" }
+  },
+  "required": ["lender_name", "lender_type", "platform_status"]
+}

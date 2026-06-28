@@ -1,0 +1,15 @@
+{
+  "name": "LenderOpportunityScore",
+  "type": "object",
+  "properties": {
+    "lender_id": { "type": "string", "description": "Linked lender ID" },
+    "product_type": { "type": "string", "description": "Product type" },
+    "score": { "type": "number", "description": "Opportunity score" },
+    "drivers": { "type": "array", "description": "Score drivers" },
+    "explanation": { "type": "string", "description": "Why lender should be reviewed" },
+    "review_status": { "type": "string", "enum": ["pending", "reviewed", "archived"], "default": "pending", "description": "Review status" },
+    "source": { "type": "string", "description": "Source data" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created date" }
+  },
+  "required": ["product_type", "score", "explanation", "review_status"]
+}

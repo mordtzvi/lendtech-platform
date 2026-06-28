@@ -1,0 +1,16 @@
+{
+  "name": "FinancialProfile",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "party_id": { "type": "string", "description": "Linked party ID" },
+    "assets": { "type": "array", "description": "Assets" },
+    "liabilities": { "type": "array", "description": "Liabilities" },
+    "income": { "type": "array", "description": "Income items" },
+    "expenditure": { "type": "array", "description": "Expenditure items" },
+    "property_portfolio_summary": { "type": "object", "description": "Portfolio summary object" },
+    "verified": { "type": "boolean", "default": false, "description": "Broker verified flag" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "party_id"]
+}

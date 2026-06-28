@@ -1,0 +1,19 @@
+{
+  "name": "AIExtractionReview",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "source_record_id": { "type": "string", "description": "Source record ID" },
+    "field_name": { "type": "string", "description": "Human readable field name" },
+    "entity_type": { "type": "string", "description": "Target entity type" },
+    "entity_id": { "type": "string", "description": "Target entity ID where known" },
+    "field_key": { "type": "string", "description": "Target field key" },
+    "suggested_value": { "type": "string", "description": "AI-suggested value" },
+    "broker_value": { "type": "string", "description": "Broker-edited value" },
+    "source_excerpt": { "type": "string", "description": "Source excerpt supporting extraction" },
+    "confidence": { "type": "number", "description": "Confidence score from 0 to 1" },
+    "status": { "type": "string", "enum": ["Pending broker review", "Applied", "Edited and applied", "Rejected", "Ask client"], "default": "Pending broker review", "description": "Review status" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created date" }
+  },
+  "required": ["case_id", "source_record_id", "field_name", "field_key", "status"]
+}

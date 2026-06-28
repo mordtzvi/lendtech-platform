@@ -1,0 +1,19 @@
+{
+  "name": "BrokerProfile",
+  "type": "object",
+  "properties": {
+    "full_name": { "type": "string", "description": "Broker full name" },
+    "email": { "type": "string", "format": "email", "description": "Broker email" },
+    "phone": { "type": "string", "description": "Broker phone" },
+    "job_title": { "type": "string", "description": "Job title" },
+    "brokerage_id": { "type": "string", "description": "Brokerage profile ID" },
+    "regulated_adviser": { "type": "boolean", "default": false, "description": "Whether broker is a regulated adviser" },
+    "can_submit_regulated_deals": { "type": "boolean", "default": false, "description": "Permission to submit regulated deals" },
+    "can_submit_unregulated_deals": { "type": "boolean", "default": true, "description": "Permission to submit unregulated deals" },
+    "can_submit_bridging": { "type": "boolean", "default": true, "description": "Permission to submit bridging cases" },
+    "can_submit_development_finance": { "type": "boolean", "default": true, "description": "Permission to submit development finance cases" },
+    "signature_block": { "type": "string", "description": "Broker signature block" },
+    "status": { "type": "string", "enum": ["pending", "active", "suspended", "archived"], "default": "active", "description": "Broker status" }
+  },
+  "required": ["full_name", "email", "brokerage_id", "status"]
+}

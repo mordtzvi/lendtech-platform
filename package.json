@@ -1,0 +1,12 @@
+{
+  "name": "lendtech-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Commercial finance operating system with broker case packaging, BankManager.ai, lender matching, lender credit papers, quote comparison, commission tracking and UK Lender Group white-label lender application.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/serve.mjs",
+    "start": "node scripts/serve.mjs"
+  }
+}

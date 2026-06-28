@@ -1,0 +1,15 @@
+{
+  "name": "LenderChangeSuggestion",
+  "type": "object",
+  "properties": {
+    "lender_id": { "type": "string", "description": "Linked lender ID" },
+    "appetite_id": { "type": "string", "description": "Linked appetite ID" },
+    "suggestion_type": { "type": "string", "description": "Suggestion type" },
+    "suggested_change": { "type": "object", "description": "Suggested change payload" },
+    "source": { "type": "string", "description": "Source of suggestion" },
+    "confidence_level": { "type": "string", "enum": ["low", "medium", "high"], "default": "low", "description": "Confidence level" },
+    "review_status": { "type": "string", "enum": ["pending", "approved", "rejected", "superseded"], "default": "pending", "description": "Admin review status" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["suggestion_type", "source", "review_status"]
+}

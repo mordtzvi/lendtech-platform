@@ -1,0 +1,33 @@
+{
+  "name": "Case",
+  "type": "object",
+  "properties": {
+    "case_reference": { "type": "string", "description": "Unique case reference" },
+    "source_brand": { "type": "string", "description": "Source brand" },
+    "source_app": { "type": "string", "description": "Source app or journey" },
+    "source_lender_id": { "type": "string", "description": "Source lender for white-label applications" },
+    "source_application_link": { "type": "string", "description": "White-label application link" },
+    "brokerage_id": { "type": "string", "description": "Brokerage profile ID" },
+    "broker_id": { "type": "string", "description": "Broker profile ID" },
+    "client_id": { "type": "string", "description": "Primary applicant/client party ID" },
+    "product_id": { "type": "string", "description": "Selected product ID" },
+    "case_type": { "type": "string", "description": "Case type" },
+    "status": {
+      "type": "string",
+      "enum": ["Draft", "AI extracted draft", "Broker review required", "Information requested", "Packaging", "Ready for lender search", "Submitted to lenders", "Terms received", "Quote comparison", "Full application", "Underwriting", "Valuation", "Legal", "Completed", "Funded", "Repaid", "Declined", "Withdrawn", "Archived"],
+      "default": "Draft",
+      "description": "Case status"
+    },
+    "loan_amount_requested": { "type": "number", "description": "Requested loan amount" },
+    "security_address_headline": { "type": "string", "description": "Primary security address headline" },
+    "submission_readiness_score": { "type": "number", "description": "Readiness score percentage" },
+    "regulated_status": { "type": "string", "description": "Regulated or compliance classification" },
+    "commercial_agreement_status": { "type": "string", "description": "Commercial agreement status" },
+    "summary": { "type": "string", "description": "Case summary" },
+    "missing_information": { "type": "array", "description": "Outstanding information items" },
+    "lenders_already_approached": { "type": "array", "description": "Lenders already approached by client or broker" },
+    "created_date": { "type": "string", "format": "date-time", "description": "Created timestamp" },
+    "updated_date": { "type": "string", "format": "date-time", "description": "Updated timestamp" }
+  },
+  "required": ["case_reference", "source_brand", "brokerage_id", "broker_id", "product_id", "status"]
+}

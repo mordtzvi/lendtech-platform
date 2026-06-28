@@ -1,0 +1,51 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Dependencies and package manager caches
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# Local build output and caches
+dist/
+build/
+.cache/
+.vite/
+coverage/
+tmp/
+temp/
+
+# Generated preview and QA artifacts
+screenshots/
+
+# Base44 local/generated metadata
+base44/.app.jsonc
+base44/.types/
+
+# Private client/customer files and uploads
+uploads/
+client-uploads/
+client-documents/
+private-documents/
+documents/private/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

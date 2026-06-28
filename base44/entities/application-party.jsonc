@@ -1,0 +1,19 @@
+{
+  "name": "ApplicationParty",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "applicant_type": {
+      "type": "string",
+      "enum": ["Sole trader / own name", "Limited company", "Partnership", "Charity", "LLP", "Trust", "SPV", "PropCo", "OpCo", "Parent company", "Guarantor", "Professional Party", "Other"],
+      "description": "Applicant or party type"
+    },
+    "name": { "type": "string", "description": "Party name" },
+    "company_number": { "type": "string", "description": "Company number where applicable" },
+    "role": { "type": "string", "description": "Role in application" },
+    "email": { "type": "string", "format": "email", "description": "Contact email" },
+    "phone": { "type": "string", "description": "Contact phone" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "applicant_type", "name"]
+}

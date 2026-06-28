@@ -1,0 +1,31 @@
+{
+  "name": "WhiteLabelApplicationSettings",
+  "type": "object",
+  "properties": {
+    "lender_id": { "type": "string", "description": "Linked lender ID" },
+    "application_link_slug": { "type": "string", "description": "Application link slug" },
+    "custom_domain_subdomain": { "type": "string", "description": "Future custom domain or subdomain" },
+    "logo": { "type": "string", "description": "Logo reference" },
+    "brand_colours": { "type": "string", "description": "Brand colours" },
+    "contact_email": { "type": "string", "format": "email", "description": "Contact email" },
+    "contact_phone": { "type": "string", "description": "Contact phone" },
+    "footer_text": { "type": "string", "description": "Footer text" },
+    "privacy_notice_link": { "type": "string", "format": "uri", "description": "Privacy notice link" },
+    "terms_link": { "type": "string", "format": "uri", "description": "Terms link" },
+    "enabled_products": { "type": "array", "description": "Enabled products" },
+    "default_application_status": { "type": "string", "description": "Default case status" },
+    "broker_applications_allowed": { "type": "boolean", "default": true, "description": "Broker applications allowed" },
+    "client_direct_applications_allowed": { "type": "boolean", "default": true, "description": "Client direct applications allowed" },
+    "introducer_applications_allowed": { "type": "boolean", "default": true, "description": "Introducer applications allowed" },
+    "requires_broker_details": { "type": "boolean", "default": true, "description": "Requires broker details" },
+    "requires_client_consent": { "type": "boolean", "default": true, "description": "Requires client consent" },
+    "requires_document_upload": { "type": "boolean", "default": true, "description": "Requires document upload" },
+    "requires_ai_pre_screening": { "type": "boolean", "default": true, "description": "Requires AI pre-screening" },
+    "auto_create_case": { "type": "boolean", "default": true, "description": "Auto-create case" },
+    "auto_create_lender_submission": { "type": "boolean", "default": true, "description": "Auto-create lender submission" },
+    "assign_to_lender_team_user": { "type": "string", "description": "Assigned lender team user" },
+    "assign_to_lendtech_admin_user": { "type": "string", "description": "Assigned LendTech admin user" },
+    "status": { "type": "string", "enum": ["draft", "active", "paused", "archived"], "default": "draft", "description": "Settings status" }
+  },
+  "required": ["lender_id", "application_link_slug", "enabled_products", "status"]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "DevelopmentExperience",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "experience_answer": {
+      "type": "string",
+      "enum": ["Yes, similar completed projects", "Yes, smaller projects", "Yes, different asset class", "No direct experience", "Experience through project manager", "Experience through appointed developer", "Experience through contractor", "Experience through JV partner", "Experience through professional team", "Unknown / TBC"],
+      "description": "Development experience answer"
+    },
+    "experience_provider": { "type": "string", "description": "Who provides experience if borrower lacks it" },
+    "risk_flag": { "type": "string", "description": "Experience risk flag" },
+    "mitigants": { "type": "string", "description": "Experience mitigants" }
+  },
+  "required": ["case_id", "experience_answer"]
+}

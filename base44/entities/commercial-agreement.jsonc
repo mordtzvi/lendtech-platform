@@ -1,0 +1,24 @@
+{
+  "name": "CommercialAgreement",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "broker_id": { "type": "string", "description": "Linked broker ID" },
+    "brokerage_id": { "type": "string", "description": "Linked brokerage ID" },
+    "lender_id": { "type": "string", "description": "Linked lender ID" },
+    "product": { "type": "string", "description": "Product" },
+    "agreed_fee_model": { "type": "string", "description": "Agreed fee model" },
+    "broker_share": { "type": "number", "description": "Broker share percentage" },
+    "lendtech_share": { "type": "number", "description": "LendTech share percentage" },
+    "enhanced_proc_fee_expected": { "type": "number", "description": "Enhanced procuration fee expected" },
+    "direct_broker_commission_equivalent": { "type": "number", "description": "Direct broker commission equivalent" },
+    "platform_uplift": { "type": "number", "description": "Platform uplift" },
+    "introducer_share": { "type": "number", "description": "Introducer share" },
+    "regulated_referral_share": { "type": "number", "description": "Regulated referral share" },
+    "agreement_status": { "type": "string", "enum": ["Draft", "Sent to broker", "Agreed", "Under negotiation", "Superseded", "Disputed", "Completed"], "default": "Draft", "description": "Agreement status" },
+    "accepted_by_broker": { "type": "boolean", "default": false, "description": "Accepted by broker" },
+    "accepted_date": { "type": "string", "format": "date", "description": "Accepted date" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "broker_id", "brokerage_id", "agreement_status"]
+}

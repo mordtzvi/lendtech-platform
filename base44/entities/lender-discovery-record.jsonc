@@ -1,0 +1,14 @@
+{
+  "name": "LenderDiscoveryRecord",
+  "type": "object",
+  "properties": {
+    "lender_name": { "type": "string", "description": "Potential lender name" },
+    "source": { "type": "string", "description": "Source of discovery" },
+    "source_url": { "type": "string", "format": "uri", "description": "Source URL" },
+    "product_signals": { "type": "array", "description": "Detected product signals" },
+    "review_status": { "type": "string", "enum": ["new", "in review", "approved", "rejected", "archived"], "default": "new", "description": "Admin review status" },
+    "confidence_level": { "type": "string", "enum": ["low", "medium", "high"], "default": "low", "description": "Confidence level" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["lender_name", "source", "review_status"]
+}

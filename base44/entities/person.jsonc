@@ -1,0 +1,21 @@
+{
+  "name": "Person",
+  "type": "object",
+  "properties": {
+    "case_id": { "type": "string", "description": "Linked case ID" },
+    "full_legal_name": { "type": "string", "description": "Full legal name" },
+    "date_of_birth": { "type": "string", "format": "date", "description": "Date of birth" },
+    "email": { "type": "string", "format": "email", "description": "Email" },
+    "phone": { "type": "string", "description": "Phone" },
+    "current_address": { "type": "string", "description": "Current address" },
+    "date_moved_in": { "type": "string", "format": "date", "description": "Date moved in" },
+    "address_history_complete": { "type": "boolean", "default": false, "description": "Whether 3-year address history is complete" },
+    "connected_party_id": { "type": "string", "description": "Linked application party ID" },
+    "role": { "type": "string", "description": "Role such as director or guarantor" },
+    "ownership_percentage": { "type": "number", "description": "Ownership percentage" },
+    "personal_guarantee_required": { "type": "boolean", "default": false, "description": "Personal guarantee required" },
+    "kyc_aml_status": { "type": "string", "enum": ["Not started", "Requested", "In review", "Complete"], "default": "Not started", "description": "KYC/AML status" },
+    "notes": { "type": "string", "description": "Notes" }
+  },
+  "required": ["case_id", "full_legal_name", "role"]
+}

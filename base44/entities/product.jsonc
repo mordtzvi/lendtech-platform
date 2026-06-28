@@ -1,0 +1,20 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "product_family": { "type": "string", "description": "Product family" },
+    "category": { "type": "string", "description": "Product category" },
+    "product_name": { "type": "string", "description": "Product name" },
+    "status": { "type": "string", "enum": ["active", "future"], "default": "future", "description": "Product status" },
+    "requires_real_estate_security": { "type": "boolean", "default": false, "description": "Requires real estate security" },
+    "requires_gdv": { "type": "boolean", "default": false, "description": "Requires GDV" },
+    "requires_development_costs": { "type": "boolean", "default": false, "description": "Requires development costs" },
+    "supports_regulated_cases": { "type": "boolean", "default": false, "description": "Supports regulated cases" },
+    "supports_private_lenders": { "type": "boolean", "default": false, "description": "Supports private lenders" },
+    "supports_white_label_lender_application": { "type": "boolean", "default": false, "description": "Supports white-label lender applications" },
+    "required_documents": { "type": "array", "description": "Required document types" },
+    "calculator_type": { "type": "string", "description": "Calculator type" },
+    "ai_prompt_type": { "type": "string", "description": "AI prompt type" }
+  },
+  "required": ["product_family", "product_name", "status"]
+}

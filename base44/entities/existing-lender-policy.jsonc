@@ -1,0 +1,14 @@
+{
+  "name": "ExistingLenderPolicy",
+  "type": "object",
+  "properties": {
+    "lender_name": { "type": "string", "description": "Existing lender name" },
+    "allows_second_charge": { "type": "boolean", "default": false, "description": "Allows second charge" },
+    "allows_equitable_charge": { "type": "boolean", "default": false, "description": "Allows equitable charge" },
+    "consent_required": { "type": "boolean", "default": true, "description": "Consent required" },
+    "known_restrictions": { "type": "string", "description": "Known restrictions" },
+    "last_updated": { "type": "string", "format": "date", "description": "Last updated" },
+    "confidence_level": { "type": "string", "enum": ["low", "medium", "high"], "default": "low", "description": "Confidence level" }
+  },
+  "required": ["lender_name", "confidence_level"]
+}
