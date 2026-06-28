@@ -2120,7 +2120,7 @@ function renderWhiteLabelApplication(slug) {
         <div class="wl-header">
           <div>
             <div class="brand-mark">${escapeHtml(lender.logo || "L")}</div>
-            <h3>${escapeHtml(lender.lender_name)} application</h3>
+            <h1>${escapeHtml(lender.lender_name)} application</h1>
             <p>Apply for bridging, development or property finance.</p>
             <span>Powered by LendTech</span>
           </div>
