@@ -19,6 +19,7 @@ This build includes:
 - Commission ledger
 - The UK Lender Group white-label application route at `/apply/uk-lender-group`
 - Demo login / switch-user mode with seeded admin, broker, lender, client, introducer and professional-party roles
+- Admin-only GitHub workflow guardrail route at `/github-sync`
 
 Placeholder boundaries are used for AI, email, documents and external integrations. The app is dependency-free and stores MVP data in browser local storage.
 
@@ -38,7 +39,7 @@ Use the bundled Node runtime if your shell does not have Node on the path:
 
 Then open the printed localhost URL.
 
-## Base44 Notes
+## Base44 / GitHub Workflow
 
 Base44 app ID: `6a40beec80768256592e94ee`.
 
@@ -46,4 +47,14 @@ Editor URL: `https://app.base44.com/apps/6a40beec80768256592e94ee/editor/workspa
 
 Preview URL: `https://lend-tech-platform-592e94ee.base44.app`
 
-GitHub should remain the source of truth. Preferred workflow: edit locally, test, commit and push to GitHub, then deploy/update Base44 from that committed source.
+GitHub remains the source of truth. Base44's visible GitHub flow currently only offers creating a new repository. Do not use that flow for LendTech because `mordtzvi/lendtech-platform` already exists.
+
+Safe workflow:
+
+1. Make or review changes in the current LendTech project.
+2. Run the static build.
+3. Commit changes to GitHub.
+4. Push with GitHub Desktop or authenticated Git.
+5. Deploy/update Base44 from the GitHub-backed project workflow.
+
+The `/github-sync` route is a super-admin/developer guardrail page only. It is hidden from broker, client, lender, introducer and professional-party demo users. The GitHub API connector may be used later for admin runtime repo management, but it is not the same as Base44 source-code sync.

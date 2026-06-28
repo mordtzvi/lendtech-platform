@@ -132,6 +132,10 @@ function isPlatformUser(user = currentUser()) {
   return ["platform"].includes(userRoleGroup(user));
 }
 
+function isDeveloperAdmin(user = currentUser()) {
+  return Boolean(user && isPlatformUser(user) && (/super admin/i.test(user.role || "") || user.id === "user-admin"));
+}
+
 function isBrokerageUser(user = currentUser()) {
   return ["brokerage_admin", "broker", "packaging"].includes(userRoleGroup(user));
 }
@@ -205,6 +209,7 @@ function defaultPathForUser(user = currentUser()) {
 function canAccessPath(path, user = currentUser()) {
   if (!user) return path === "/login";
   if (path === "/demo/permissions") return true;
+  if (path === "/github-sync") return isDeveloperAdmin(user);
   const group = userRoleGroup(user);
   const caseRecord = getCaseFromPath(path);
   const tab = path.split("/")[3] || "";
@@ -492,6 +497,13 @@ function renderLogin() {
           </div>
         </div>
         <div class="login-form demo-login-list">
+          <div class="demo-workflow-banner">
+            <div>
+              <strong>Role-scoped demo access</strong>
+              <span>Choose a broker, client, lender or platform admin to test that journey. Developer tooling is hidden unless you log in as the LendTech super admin.</span>
+            </div>
+            <a class="button compact" href="/apply/uk-lender-group" data-link>Open UKLG application</a>
+          </div>
           <div class="band-header login-card-header">
             <div>
               <h3>Choose a demo user</h3>
@@ -610,6 +622,14 @@ function navSectionsForUser(user = currentUser()) {
   const caseId = caseRecord?.id || "case-hendon-dev";
   const group = userRoleGroup(user);
   if (group === "platform") {
+    const controlLinks = [
+      ["/admin/products", "PR", "Products"],
+      ["/admin/market-intelligence", "MI", "Market intel"],
+      ["/admin/commissions", "CM", "Commissions"],
+      ["/admin/audit", "AU", "Audit"],
+      ...(isDeveloperAdmin(user) ? [["/github-sync", "GH", "GitHub sync"]] : []),
+      ["/admin/settings", "ST", "Settings"]
+    ];
     return [
       ["Platform", [
         ["/dashboard", "DB", "Dashboard"],
@@ -620,13 +640,7 @@ function navSectionsForUser(user = currentUser()) {
         ["/admin/clients", "CL", "Clients"],
         ["/admin/lenders", "LN", "Lenders"]
       ]],
-      ["Control", [
-        ["/admin/products", "PR", "Products"],
-        ["/admin/market-intelligence", "MI", "Market intel"],
-        ["/admin/commissions", "CM", "Commissions"],
-        ["/admin/audit", "AU", "Audit"],
-        ["/admin/settings", "ST", "Settings"]
-      ]]
+      ["Control", controlLinks]
     ];
   }
   if (group === "brokerage_admin") {
@@ -754,6 +768,7 @@ function routeTitle(path) {
     "/admin/commissions": ["Commissions", "Permissioned commission ledger oversight"],
     "/admin/audit": ["Audit", "Cross-platform audit trail"],
     "/admin/settings": ["Settings", "Demo settings and production authentication placeholders"],
+    "/github-sync": ["GitHub sync", "Admin-only source control and Base44 workflow guardrails"],
     "/commissions": ["Commissions", "Permissioned broker commission view"],
     "/brokerage/settings": ["Brokerage settings", "Branding, users and demo-auth placeholders"],
     "/profiles/broker": ["Broker profile", "Permissions, activity, cases and commission visibility"],
@@ -804,6 +819,7 @@ function renderRoute(path) {
   if (path === "/admin/commissions") return renderCommissionsPage({ admin: true });
   if (path === "/admin/audit") return renderAuditAdmin();
   if (path === "/admin/settings") return renderSettingsPlaceholder();
+  if (path === "/github-sync") return renderGitHubSyncAdmin();
   if (path === "/commissions") return renderCommissionsPage();
   if (path === "/brokerage/settings") return renderSettingsPlaceholder("Brokerage settings");
   if (path === "/profiles/broker") return renderBrokerProfilePage();
@@ -2589,6 +2605,97 @@ function renderSettingsPlaceholder(title = "Settings") {
           <h3>Production auth required</h3>
           <p>Future production access should include secure login, MFA, invitations, role approval, password reset, session management and audit logging.</p>
         </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderGitHubSyncAdmin() {
+  const repoUrl = "https://github.com/mordtzvi/lendtech-platform";
+  const workflowSteps = [
+    "Make or review changes in the current LendTech project",
+    "Run the static build before publishing",
+    "Commit changes to GitHub on the active feature branch",
+    "Push with GitHub Desktop or authenticated Git",
+    "Deploy/update Base44 from the GitHub-backed project workflow"
+  ];
+  const branches = [
+    { branch: "feature/ui-redesign", purpose: "Current UI, role-login and BankManager.ai sprint branch" },
+    { branch: "main", purpose: "Stable production branch after review" },
+    { branch: "develop", purpose: "Shared development branch once promoted" }
+  ];
+  return `
+    <section class="developer-hero">
+      <div>
+        <div class="eyebrow">Admin developer tool</div>
+        <h2>GitHub source of truth</h2>
+        <p>Base44's visible GitHub button currently offers new repository creation only. Do not use it for LendTech. Keep the existing GitHub repository as the central source of truth.</p>
+      </div>
+      <div class="developer-hero-actions">
+        ${statusPill("Super admin only")}
+        ${statusPill("No new repo")}
+        <a class="button primary" href="${repoUrl}" target="_blank" rel="noreferrer">Open GitHub repo</a>
+      </div>
+    </section>
+    <div class="developer-grid">
+      <section class="surface-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Repository rules</h3>
+            <p>These rules prevent local, GitHub and Base44 versions from drifting apart.</p>
+          </div>
+        </div>
+        <dl class="kv clean-kv">
+          <dt>Existing repo</dt><dd>mordtzvi/lendtech-platform</dd>
+          <dt>Active branch</dt><dd>feature/ui-redesign</dd>
+          <dt>Base44 2-way sync</dt><dd>Skipped for now because the dashboard flow only offers new repo creation.</dd>
+          <dt>GitHub API connector</dt><dd>Optional admin/runtime tool only. It is not Base44 source sync.</dd>
+          <dt>Hidden from</dt><dd>Brokers, clients, lenders, introducers and professional users.</dd>
+        </dl>
+        <div class="alert amber">Do not create a new GitHub repository from Base44 and do not overwrite <strong>mordtzvi/lendtech-platform</strong>.</div>
+      </section>
+      <section class="surface-panel">
+        <div class="section-heading">
+          <div>
+            <h3>Safe workflow</h3>
+            <p>Use this sequence until Base44 exposes an existing-repo sync option.</p>
+          </div>
+        </div>
+        <div class="workflow-steps vertical">
+          ${workflowSteps.map((step, index) => `<div class="step-card"><span>${index + 1}</span><strong>${escapeHtml(step)}</strong></div>`).join("")}
+        </div>
+      </section>
+    </div>
+    <section class="surface-panel">
+      <div class="section-heading">
+        <div>
+          <h3>Branch view</h3>
+          <p>Use feature branches for active Base44/Codex work, then promote into stable branches after review.</p>
+        </div>
+      </div>
+      <div class="branch-card-grid">
+        ${branches.map((item) => `
+          <article class="branch-card">
+            <span class="mini-icon">BR</span>
+            <div>
+              <strong>${escapeHtml(item.branch)}</strong>
+              <p>${escapeHtml(item.purpose)}</p>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </section>
+    <section class="surface-panel">
+      <div class="section-heading">
+        <div>
+          <h3>Before any GitHub action</h3>
+          <p>Branch creation and pull request actions should stay deliberate.</p>
+        </div>
+      </div>
+      <div class="confirmation-grid">
+        <div class="confirmation-card">${fieldStatusBadge("Confirm before creating branches")}<p>Use clear branch names such as feature/ui-redesign, fix/login-roles or chore/base44-deploy.</p></div>
+        <div class="confirmation-card">${fieldStatusBadge("Confirm before opening PRs")}<p>Check target branch, summary and testing notes before sending work for review.</p></div>
+        <div class="confirmation-card">${fieldStatusBadge("Audit developer actions")}<p>Production source-control actions should be logged when real backend auth is added.</p></div>
       </div>
     </section>
   `;

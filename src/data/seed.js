@@ -105,6 +105,7 @@ export function createSeedData() {
           "Manage lenders",
           "Manage products",
           "Manage market intelligence",
+          "Manage developer workflow",
           "View audit",
           "View all cases",
           "View all submissions",
